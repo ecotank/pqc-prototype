@@ -242,27 +242,22 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 		return nil, nil, fmt.Errorf("gagal menerbitkan sertifikat: %w", err)
 	}
 
-	// Periksa apakah berkas PDF sudah memiliki placeholder alokasi tanda tangan baru
-	placeholderZeros := bytes.Repeat([]byte("0"), 1000)
-	idxZeros := bytes.LastIndex(pdfData, placeholderZeros)
+	// Periksa apakah berkas PDF sudah memiliki slot placeholder kosong yang belum terisi (diawali '00000000...')
+	// Sebuah tanda tangan nyata selalu diawali '3082...' (ASN.1 DER Sequence), sedangkan placeholder kosong diawali '00000000'
+	unfilledPlaceholderTag := []byte("/Contents <00000000")
+	idxPlaceholder := bytes.LastIndex(pdfData, unfilledPlaceholderTag)
 
 	var workingPDF []byte
 	var startContents, endContents int
 	var offset1, offset2, offset3 int
 	const placeholderLen = 32768 // 32768 byte DER = 65536 karakter hexa
 
-	if idxZeros != -1 {
-		// Ditemukan slot placeholder alokasi tanda tangan baru (disiapkan pdf-signer.js)
+	if idxPlaceholder != -1 {
+		// Ditemukan slot placeholder alokasi tanda tangan baru yang belum terisi
 		workingPDF = make([]byte, len(pdfData))
 		copy(workingPDF, pdfData)
 
-		prefix := workingPDF[:idxZeros]
-		lastContents := bytes.LastIndex(prefix, []byte("/Contents <"))
-		if lastContents == -1 {
-			return nil, nil, fmt.Errorf("tag /Contents < tidak ditemukan sebelum placeholder")
-		}
-
-		startContents = lastContents + len("/Contents <")
+		startContents = idxPlaceholder + len("/Contents <")
 		endContents = bytes.IndexByte(workingPDF[startContents:], '>')
 		if endContents == -1 {
 			return nil, nil, fmt.Errorf("tanda penutup '>' untuk /Contents tidak ditemukan")
