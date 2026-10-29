@@ -100,12 +100,16 @@ createApp({
   },
 
   mounted() {
-    // Restore session if exists
+    // Restore session if exists, otherwise default to Satria Alba (BSrE ASN Demo)
     const savedUser = localStorage.getItem('pqc_user');
     if (savedUser) {
       try {
         this.currentUser = JSON.parse(savedUser);
       } catch (e) {}
+    }
+    if (!this.currentUser && window.DEFAULT_DEMO_USERS && window.DEFAULT_DEMO_USERS.length > 0) {
+      this.currentUser = window.DEFAULT_DEMO_USERS[0];
+      localStorage.setItem('pqc_user', JSON.stringify(this.currentUser));
     }
 
     if (window.pdfjsLib) {
@@ -361,11 +365,12 @@ createApp({
 
         const dataCopy = pdfData.slice(0);
         const loadingTask = pdfjsLib.getDocument({ data: dataCopy });
-        this.pdfDocProxy = await loadingTask.promise;
-        this.pdfTotalPages = this.pdfDocProxy.numPages;
+        const rawDoc = await loadingTask.promise;
+        this.pdfDocProxy = (window.Vue && window.Vue.markRaw) ? window.Vue.markRaw(rawDoc) : rawDoc;
+        this.pdfTotalPages = rawDoc.numPages;
         this.pdfCurrentPage = Math.min(Math.max(1, pageNumber), this.pdfTotalPages);
 
-        const page = await this.pdfDocProxy.getPage(this.pdfCurrentPage);
+        const page = await rawDoc.getPage(this.pdfCurrentPage);
         const viewport = page.getViewport({ scale: 1.0 });
         this.pdfActualPageWidth = viewport.width;
         this.pdfActualPageHeight = viewport.height;
@@ -374,7 +379,10 @@ createApp({
         if (!canvas) return;
 
         const container = canvas.parentElement;
-        const availableWidth = container ? Math.min(container.clientWidth, 680) : 580;
+        let availableWidth = 580;
+        if (container && container.clientWidth > 150) {
+          availableWidth = Math.min(container.clientWidth, 680);
+        }
         const scale = availableWidth / viewport.width;
 
         const scaledViewport = page.getViewport({ scale: scale });
@@ -820,13 +828,15 @@ createApp({
             durationMs: data.data.verify_duration_ms,
             reason: data.data.reason
           };
+          this.isVerifying = false;
           return;
-        } else {
+        } else if (data && data.message) {
           this.verifyStatus = {
             valid: false,
             durationMs: 0,
-            reason: (data && data.message) || 'Verifikasi gagal diproses'
+            reason: data.message
           };
+          this.isVerifying = false;
           return;
         }
       } catch (err) {
@@ -847,9 +857,7 @@ createApp({
           reason: 'Format tanda tangan tidak valid atau digest tidak cocok.'
         };
       }
-      } finally {
-        this.isVerifying = false;
-      }
+      this.isVerifying = false;
     },
 
     async handleVerifyFileUpload(e) {

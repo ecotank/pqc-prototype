@@ -386,9 +386,6 @@ createApp({
         ];
       }
     },
-        console.error(err);
-      }
-    },
 
     copyToClipboard(text) {
       if (!text) return;
