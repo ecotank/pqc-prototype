@@ -85,6 +85,7 @@ func BuildPKCS7SignedData(
 	signerCert *x509.Certificate,
 	signerCertDER []byte,
 	subCACertDER []byte,
+	rootCACertDER []byte,
 	rsaKey *rsa.PrivateKey,
 	mldsaSigHex string,
 	mldsaPubKeyHex string,
@@ -151,6 +152,9 @@ func BuildPKCS7SignedData(
 	var certsRaw []byte
 	certsRaw = append(certsRaw, signerCertDER...)
 	certsRaw = append(certsRaw, subCACertDER...)
+	if len(rootCACertDER) > 0 {
+		certsRaw = append(certsRaw, rootCACertDER...)
+	}
 
 	sd := SignedData{
 		Version: 1,
@@ -238,21 +242,27 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 		return nil, nil, fmt.Errorf("gagal menerbitkan sertifikat: %w", err)
 	}
 
-	// Periksa apakah berkas PDF sudah memiliki placeholder alokasi tanda tangan
-	contentsTag := []byte("/Contents <")
-	idxContentsTag := bytes.Index(pdfData, contentsTag)
+	// Periksa apakah berkas PDF sudah memiliki placeholder alokasi tanda tangan baru
+	placeholderZeros := bytes.Repeat([]byte("0"), 1000)
+	idxZeros := bytes.LastIndex(pdfData, placeholderZeros)
 
 	var workingPDF []byte
 	var startContents, endContents int
 	var offset1, offset2, offset3 int
 	const placeholderLen = 32768 // 32768 byte DER = 65536 karakter hexa
 
-	if idxContentsTag != -1 {
-		// PDF sudah memiliki struktur alokasi tanda tangan (misal disiapkan pdf-signer.js)
+	if idxZeros != -1 {
+		// Ditemukan slot placeholder alokasi tanda tangan baru (disiapkan pdf-signer.js)
 		workingPDF = make([]byte, len(pdfData))
 		copy(workingPDF, pdfData)
 
-		startContents = idxContentsTag + len(contentsTag)
+		prefix := workingPDF[:idxZeros]
+		lastContents := bytes.LastIndex(prefix, []byte("/Contents <"))
+		if lastContents == -1 {
+			return nil, nil, fmt.Errorf("tag /Contents < tidak ditemukan sebelum placeholder")
+		}
+
+		startContents = lastContents + len("/Contents <")
 		endContents = bytes.IndexByte(workingPDF[startContents:], '>')
 		if endContents == -1 {
 			return nil, nil, fmt.Errorf("tanda penutup '>' untuk /Contents tidak ditemukan")
@@ -263,8 +273,9 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 		offset2 = endContents + 1
 		offset3 = len(workingPDF) - offset2
 
-		// Perbarui ByteRange placeholder di berkas
-		byteRangePos := bytes.Index(workingPDF, []byte("/ByteRange"))
+		// Perbarui /ByteRange placeholder spesifik untuk signature baru ini
+		prefixForBR := workingPDF[:startContents]
+		byteRangePos := bytes.LastIndex(prefixForBR, []byte("/ByteRange"))
 		if byteRangePos != -1 {
 			endBracket := bytes.IndexByte(workingPDF[byteRangePos:], ']')
 			if endBracket != -1 {
@@ -306,6 +317,7 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 		signerCert,
 		signerCertDER,
 		ca.SubCACertDER,
+		ca.RootCertDER,
 		rsaKey,
 		mldsaRes.SignatureHex,
 		hex.EncodeToString(opts.MLDSAPublicKey),

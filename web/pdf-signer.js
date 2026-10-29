@@ -243,33 +243,47 @@ window.PDFSigner = (function() {
     const widgetRef = pdfDoc.context.register(widgetDict);
     targetPage.node.addAnnot(widgetRef);
 
-    // Daftarkan ke AcroForm di Catalog PDF
-    const acroForm = pdfDoc.context.obj({
-      Fields: [widgetRef],
-      SigFlags: 3
-    });
-    pdfDoc.catalog.set(PDFLib.PDFName.of('AcroForm'), pdfDoc.context.register(acroForm));
+    // Daftarkan ke AcroForm di Catalog PDF tanpa menimpa signature lama jika ada
+    if (pdfDoc.catalog.has(PDFLib.PDFName.of('AcroForm'))) {
+      const existingAcroForm = pdfDoc.catalog.lookup(PDFLib.PDFName.of('AcroForm'));
+      if (existingAcroForm && existingAcroForm instanceof PDFLib.PDFDict) {
+        let fields = existingAcroForm.lookup(PDFLib.PDFName.of('Fields'));
+        if (fields && fields instanceof PDFLib.PDFArray) {
+          fields.push(widgetRef);
+        } else {
+          existingAcroForm.set(PDFLib.PDFName.of('Fields'), pdfDoc.context.obj([widgetRef]));
+        }
+        existingAcroForm.set(PDFLib.PDFName.of('SigFlags'), PDFLib.PDFNumber.of(3));
+      }
+    } else {
+      const acroForm = pdfDoc.context.obj({
+        Fields: [widgetRef],
+        SigFlags: 3
+      });
+      pdfDoc.catalog.set(PDFLib.PDFName.of('AcroForm'), pdfDoc.context.register(acroForm));
+    }
 
     // 9. Simpan Dokumen dengan useObjectStreams: false untuk kompatibilitas mutlak ISO 32000-1 PAdES
     const rawSaved = await pdfDoc.save({ useObjectStreams: false });
     let pdfBytes = new Uint8Array(rawSaved);
 
-    // Cari posisi pasti /ByteRange dan /Contents
+    // Cari posisi pasti /ByteRange dan /Contents KHUSUS placeholder baru ini
     const strData = new TextDecoder('latin1').decode(pdfBytes);
-    const contentsIdx = strData.indexOf('/Contents <');
+    const placeholderPattern = 'Contents <' + placeholderHex.slice(0, 64);
+    const contentsIdx = strData.lastIndexOf(placeholderPattern);
     let offset1 = 0, offset2 = 0, offset3 = 0, byteRangeDocDigest = '';
 
     if (contentsIdx !== -1) {
-      const startContents = contentsIdx + 11;
-      const endContents = strData.indexOf('>', startContents);
-      if (endContents !== -1) {
+      const startContents = contentsIdx + 10;
+      const endContents = startContents + (placeholderLength * 2);
+      if (endContents < pdfBytes.length) {
         offset1 = startContents - 1;
         offset2 = endContents + 1;
         offset3 = pdfBytes.length - offset2;
 
         const byteRangeStr = `/ByteRange [ 0 ${String(offset1).padStart(10, '0')} ${String(offset2).padStart(10, '0')} ${String(offset3).padStart(10, '0')} ]`;
         const byteRangePlaceholderPattern = '/ByteRange [ 0 1000000000 1000000000 1000000000 ]';
-        const brIdx = strData.indexOf(byteRangePlaceholderPattern);
+        const brIdx = strData.lastIndexOf(byteRangePlaceholderPattern);
         if (brIdx !== -1) {
           const enc = new TextEncoder();
           const brBytes = enc.encode(byteRangeStr);
