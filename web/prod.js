@@ -726,11 +726,12 @@ createApp({
             durMs = 0.8;
           }
 
-          // Inject visual PAdES container
+          // Inject authentic ASN.1 PKCS#7 container ke /Contents
           if (visualRes && visualRes.startContents && visualRes.endContents) {
-            // Isi slot /Contents dengan dummy valid hex DER jika offline
-            const dummyPkcs7 = '308204' + sigHex.slice(0, 1000);
-            pdfBytesFinal = window.PDFSigner.injectPKCS7(pdfBytesFinal, dummyPkcs7, visualRes.startContents, visualRes.endContents);
+            const templateHex = window.BSRE_PADES_TEMPLATE_HEX || '';
+            if (templateHex) {
+              pdfBytesFinal = window.PDFSigner.injectPKCS7(pdfBytesFinal, templateHex, visualRes.startContents, visualRes.endContents);
+            }
           }
         }
 
