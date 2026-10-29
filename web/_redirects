@@ -1,5 +1,7 @@
-# Arahkan root langsung ke portal produksi TTE
-/    /production.html   200
-/prod /production.html  200
-/lab  /index.html       200
-
+# Konfigurasi rewrite rute Netlify
+/              /index.html         200!
+/prod          /index.html         200!
+/production    /index.html         200!
+/production.html /index.html       200!
+/lab           /lab.html           200!
+/process       /process.html       200!
