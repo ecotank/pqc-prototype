@@ -740,6 +740,8 @@ createApp({
           blobUrl = URL.createObjectURL(blob);
         }
 
+        const now = new Date();
+
         this.signedResult = {
           receiptId: receiptUUID,
           algorithm: algName,
