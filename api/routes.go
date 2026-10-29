@@ -42,6 +42,10 @@ func RegisterRoutes(mux *http.ServeMux, h *APIHandler) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.HandleAuthLogin)
 	mux.HandleFunc("POST /api/v1/auth/register", h.HandleAuthRegister)
 	mux.HandleFunc("GET /api/v1/auth/users", h.HandleAuthUsersList)
+
+	// 12. PAdES ISO 32000-1 Digital Signature & CA Endpoints
+	mux.HandleFunc("POST /api/v1/pades/sign", h.HandlePAdESSign)
+	mux.HandleFunc("GET /api/v1/ca/certificates", h.HandleCACertificates)
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {

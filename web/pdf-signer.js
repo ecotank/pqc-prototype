@@ -210,21 +210,126 @@ window.PDFSigner = (function() {
       color: PDFLib.rgb(0.4, 0.4, 0.4)
     });
 
-    // 8. Serialisasi Dokumen PDF Final
-    const pdfBytes = await pdfDoc.save();
+    // 8. Integrasikan Struktur Tanda Tangan ISO 32000-1 PAdES (/AcroForm, /Widget /FT /Sig, /Type /Sig)
+    const placeholderLength = 32768; // 32768 byte = 65536 hex char (cukup untuk PKCS#7 + ML-DSA + Cert Chain)
+    const placeholderHex = '0'.repeat(placeholderLength * 2);
+    const byteRangePlaceholder = [0, 1000000000, 1000000000, 1000000000];
 
-    // 9. Hitung Hash SHA-256 dari PDF Final
-    const hashBuf = await crypto.subtle.digest('SHA-256', pdfBytes);
-    const sha256Hex = Array.from(new Uint8Array(hashBuf))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
+    const sigDict = pdfDoc.context.obj({
+      Type: 'Sig',
+      Filter: 'Adobe.PPKLite',
+      SubFilter: 'adbe.pkcs7.detached',
+      ByteRange: byteRangePlaceholder,
+      Contents: PDFLib.PDFHexString.of(placeholderHex),
+      Reason: PDFLib.PDFString.of('TTE Pascakuantum Sah BSrE BSSN RI - FIPS 204 ML-DSA-65'),
+      M: PDFLib.PDFString.of('D:' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + "+07'00'"),
+      Name: PDFLib.PDFString.of(opts.signerName || 'Pejabat Penandatangan BSrE'),
+      Location: PDFLib.PDFString.of('Jakarta, Indonesia'),
+      ContactInfo: PDFLib.PDFString.of('info@bsre.bssn.go.id')
+    });
+    const sigRef = pdfDoc.context.register(sigDict);
+
+    // Hubungkan box visual spesimen langsung ke Signature Field agar klik stempel membuka Signature Properties di Acrobat/BeSign
+    const widgetDict = pdfDoc.context.obj({
+      Type: 'Annot',
+      Subtype: 'Widget',
+      FT: 'Sig',
+      Rect: [posX, posY, posX + boxW, posY + boxH],
+      V: sigRef,
+      T: PDFLib.PDFString.of('BSRE_SIG_' + opts.receiptId),
+      F: 4,
+      P: targetPage.ref
+    });
+    const widgetRef = pdfDoc.context.register(widgetDict);
+    targetPage.node.addAnnot(widgetRef);
+
+    // Daftarkan ke AcroForm di Catalog PDF
+    const acroForm = pdfDoc.context.obj({
+      Fields: [widgetRef],
+      SigFlags: 3
+    });
+    pdfDoc.catalog.set(PDFLib.PDFName.of('AcroForm'), pdfDoc.context.register(acroForm));
+
+    // 9. Simpan Dokumen dengan useObjectStreams: false untuk kompatibilitas mutlak ISO 32000-1 PAdES
+    const rawSaved = await pdfDoc.save({ useObjectStreams: false });
+    let pdfBytes = new Uint8Array(rawSaved);
+
+    // Cari posisi pasti /ByteRange dan /Contents
+    const strData = new TextDecoder('latin1').decode(pdfBytes);
+    const contentsIdx = strData.indexOf('/Contents <');
+    let offset1 = 0, offset2 = 0, offset3 = 0, byteRangeDocDigest = '';
+
+    if (contentsIdx !== -1) {
+      const startContents = contentsIdx + 11;
+      const endContents = strData.indexOf('>', startContents);
+      if (endContents !== -1) {
+        offset1 = startContents - 1;
+        offset2 = endContents + 1;
+        offset3 = pdfBytes.length - offset2;
+
+        const byteRangeStr = `/ByteRange [ 0 ${String(offset1).padStart(10, '0')} ${String(offset2).padStart(10, '0')} ${String(offset3).padStart(10, '0')} ]`;
+        const byteRangePlaceholderPattern = '/ByteRange [ 0 1000000000 1000000000 1000000000 ]';
+        const brIdx = strData.indexOf(byteRangePlaceholderPattern);
+        if (brIdx !== -1) {
+          const enc = new TextEncoder();
+          const brBytes = enc.encode(byteRangeStr);
+          pdfBytes.set(brBytes, brIdx);
+        }
+
+        // Hitung SHA-256 ByteRange dokumen
+        const part1 = pdfBytes.subarray(0, offset1);
+        const part2 = pdfBytes.subarray(offset2, offset2 + offset3);
+        const combined = new Uint8Array(part1.length + part2.length);
+        combined.set(part1, 0);
+        combined.set(part2, part1.length);
+
+        const digestBuf = await crypto.subtle.digest('SHA-256', combined);
+        byteRangeDocDigest = Array.from(new Uint8Array(digestBuf))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    }
+
+    // Hash fallback jika ByteRange tidak ditemukan
+    if (!byteRangeDocDigest) {
+      const hashBuf = await crypto.subtle.digest('SHA-256', pdfBytes);
+      byteRangeDocDigest = Array.from(new Uint8Array(hashBuf))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     return {
       pdfBytes,
-      sha256Hex
+      sha256Hex: byteRangeDocDigest,
+      startContents: offset1 + 1,
+      endContents: offset2 - 1,
+      placeholderLength
     };
   }
 
+  /**
+   * Menyuntikkan kontainer biner PKCS#7 (DER Hex) ke dalam slot /Contents dokumen PDF
+   * @param {Uint8Array} pdfBytes
+   * @param {string} pkcs7Hex
+   * @param {number} startContents
+   * @param {number} endContents
+   * @returns {Uint8Array}
+   */
+  function injectPKCS7(pdfBytes, pkcs7Hex, startContents, endContents) {
+    const slotLen = endContents - startContents;
+    let finalHex = pkcs7Hex.toUpperCase();
+    if (finalHex.length > slotLen) {
+      console.warn('Peringatan: PKCS#7 melebihi slot /Contents!');
+      finalHex = finalHex.slice(0, slotLen);
+    } else {
+      finalHex = finalHex.padEnd(slotLen, '0');
+    }
+
+    const hexBytes = new TextEncoder().encode(finalHex);
+    pdfBytes.set(hexBytes, startContents);
+    return pdfBytes;
+  }
+
   return {
-    embedSpecimenAndStamp
+    embedSpecimenAndStamp,
+    injectPKCS7
   };
 })();

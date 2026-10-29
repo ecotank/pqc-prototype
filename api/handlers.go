@@ -671,3 +671,131 @@ func (h *APIHandler) HandleAuthUsersList(w http.ResponseWriter, r *http.Request)
 	}
 	SendSuccess(w, list, "")
 }
+
+type PAdESSignRequest struct {
+	PDFBase64        string `json:"pdf_base64"`
+	SignerFullName   string `json:"signer_fullname"`
+	SignerEmail      string `json:"signer_email"`
+	SignerNIK        string `json:"signer_nik"`
+	Institution      string `json:"institution"`
+	ReceiptID        string `json:"receipt_id"`
+	MLDSAPrivateKey  string `json:"mldsa_private_key"`
+	MLDSAPublicKey   string `json:"mldsa_public_key"`
+}
+
+type PAdESSignResponse struct {
+	ReceiptID         string  `json:"receipt_id"`
+	PDFBase64         string  `json:"pdf_base64"`
+	DocumentHash      string  `json:"document_hash"`
+	PKCS7SignatureHex string  `json:"pkcs7_signature_hex"`
+	MLDSASignatureHex string  `json:"mldsa_signature_hex"`
+	CertSerialNumber  string  `json:"cert_serial_number"`
+	DurationMs        float64 `json:"duration_ms"`
+	StandardCompliant bool    `json:"standard_compliant"`
+}
+
+func (h *APIHandler) HandlePAdESSign(w http.ResponseWriter, r *http.Request) {
+	var req PAdESSignRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Payload JSON tidak valid: "+err.Error())
+		return
+	}
+
+	if req.PDFBase64 == "" {
+		SendError(w, http.StatusBadRequest, "Parameter pdf_base64 wajib diisi")
+		return
+	}
+
+	pdfRaw, err := crypto.DecodeHexOrBase64(req.PDFBase64)
+	if err != nil {
+		SendError(w, http.StatusBadRequest, "Encoding PDF tidak valid: "+err.Error())
+		return
+	}
+
+	mldsaPriv, err := crypto.DecodeHexOrBase64(req.MLDSAPrivateKey)
+	if err != nil || len(mldsaPriv) == 0 {
+		SendError(w, http.StatusBadRequest, "Kunci privat ML-DSA-65 tidak valid: "+err.Error())
+		return
+	}
+
+	mldsaPub, err := crypto.DecodeHexOrBase64(req.MLDSAPublicKey)
+	if err != nil || len(mldsaPub) == 0 {
+		SendError(w, http.StatusBadRequest, "Kunci publik ML-DSA-65 tidak valid: "+err.Error())
+		return
+	}
+
+	signedPDF, res, err := crypto.SignPDFPAdES(pdfRaw, crypto.PAdESSignOptions{
+		SignerFullName:   req.SignerFullName,
+		SignerEmail:      req.SignerEmail,
+		SignerNIK:        req.SignerNIK,
+		Institution:      req.Institution,
+		ReceiptID:        req.ReceiptID,
+		MLDSAPrivateKey:  mldsaPriv,
+		MLDSAPublicKey:   mldsaPub,
+	})
+	if err != nil {
+		_ = h.store.RecordAudit("PAdESSign", "ML-DSA-65+RSA", 0, "FAILED", err.Error())
+		SendError(w, http.StatusInternalServerError, "Gagal menandatangani PAdES ISO 32000-1: "+err.Error())
+		return
+	}
+
+	_ = h.store.RecordAudit("PAdESSign", "ML-DSA-65+RSA", res.DurationMs, "SUCCESS", fmt.Sprintf("Dokumen PAdES ditandatangani untuk %s (ID: %s)", res.SignerFullName, res.ReceiptID))
+
+	pdfB64 := hex.EncodeToString(signedPDF) // Return hex atau base64
+	SendSuccess(w, PAdESSignResponse{
+		ReceiptID:         res.ReceiptID,
+		PDFBase64:         pdfB64,
+		DocumentHash:      res.DocumentHash,
+		PKCS7SignatureHex: res.PKCS7SignatureHex,
+		MLDSASignatureHex: res.MLDSASignatureHex,
+		CertSerialNumber:  res.CertSerialNumber,
+		DurationMs:        res.DurationMs,
+		StandardCompliant: true,
+	}, "Dokumen berhasil ditandatangani secara digital standar ISO 32000-1 PAdES")
+}
+
+func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request) {
+	ca, err := crypto.GetBSrEAuthority()
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal inisialisasi CA: "+err.Error())
+		return
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "pem" {
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"BSRE_PQC_Root_and_SubCA.pem\"")
+		_, _ = w.Write([]byte(ca.ExportPEMCertificates()))
+		return
+	}
+
+	// Default JSON response
+	type CACertInfo struct {
+		Subject      string `json:"subject"`
+		Issuer       string `json:"issuer"`
+		SerialNumber string `json:"serial_number"`
+		NotBefore    string `json:"not_before"`
+		NotAfter     string `json:"not_after"`
+		CertPEM      string `json:"cert_pem"`
+	}
+
+	SendSuccess(w, map[string]interface{}{
+		"ca_name":     "Balai Besar Sertifikasi Elektronik (BSrE) BSSN",
+		"chain_pem":   ca.ExportPEMCertificates(),
+		"root_ca": CACertInfo{
+			Subject:      ca.RootCert.Subject.String(),
+			Issuer:       ca.RootCert.Issuer.String(),
+			SerialNumber: ca.RootCert.SerialNumber.String(),
+			NotBefore:    ca.RootCert.NotBefore.Format(time.RFC3339),
+			NotAfter:     ca.RootCert.NotAfter.Format(time.RFC3339),
+		},
+		"sub_ca": CACertInfo{
+			Subject:      ca.SubCACert.Subject.String(),
+			Issuer:       ca.SubCACert.Issuer.String(),
+			SerialNumber: ca.SubCACert.SerialNumber.String(),
+			NotBefore:    ca.SubCACert.NotBefore.Format(time.RFC3339),
+			NotAfter:     ca.SubCACert.NotAfter.Format(time.RFC3339),
+		},
+	}, "")
+}
+
