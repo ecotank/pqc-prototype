@@ -18,7 +18,9 @@ scratch/
 .system_generated/
 tmp/
 *.tmp
+.netlify/
 
 # OS Files
 .DS_Store
 Thumbs.db
+
