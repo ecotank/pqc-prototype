@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laboratorium Visualisasi Proses Kriptografi ML-DSA (FIPS 204) - BSrE BSSN</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            pqcblue: '#0284c7',
+            pqcpurple: '#8b5cf6',
+            pqcgreen: '#10b981',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Vue 3 & Chart.js -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+  <div id="app" class="flex-1 flex flex-col">
+
+    <!-- Top Announcement Bar / Mode Switcher -->
+    <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 border-b border-purple-800/40 text-xs py-2 px-4">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">MODE VISUALISASI PROSES (LAB RISET & EDUKASI)</span>
+          <span class="text-slate-300">Menampilkan Alur Komputasi Internal, Transformasi Matriks Lattice, dan Pembongkaran Byte FIPS 204</span>
+        </div>
+        <div class="flex items-center space-x-3">
+          <a href="/production.html" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow transition flex items-center space-x-1.5 text-xs">
+            <span>🏛️ Beralih ke Web Siap Produksi</span>
+            <span>&rarr;</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-600 to-blue-700 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-purple-500/20">
+            λ
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-white text-base">Laboratorium Kriptografi Pascakuantum</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">FIPS 204 Deep Dive</span>
+            </div>
+            <div class="text-xs text-slate-400">Inspeksi Alur Internal Penandatanganan & Verifikasi ML-DSA • Kelompok RPLK 2 BSrE</div>
+          </div>
+        </div>
+
+        <nav class="flex items-center space-x-1 sm:space-x-2">
+          <button @click="activeTab = 'pipeline'" :class="tabClass('pipeline')">
+            ⚙️ Alur Proses Sign
+          </button>
+          <button @click="activeTab = 'verify-trace'" :class="tabClass('verify-trace')">
+            🔬 Alur Proses Verify
+          </button>
+          <button @click="activeTab = 'bytes'" :class="tabClass('bytes')">
+            📦 Anatomi Byte
+          </button>
+          <button @click="activeTab = 'bench'" :class="tabClass('bench')">
+            📊 Kinerja & Standar
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+      <!-- ================= TAB 1: VISUALISASI ALUR PENANDATANGANAN ================= -->
+      <section v-if="activeTab === 'pipeline'" class="space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Visualisasi Alur Penandatanganan ML-DSA (FIPS 204 Algoritma 2)</h2>
+            <p class="text-sm text-slate-400">Dekomposisi bertahap dari masukan pesan hingga packing byte tanda tangan pascakuantum</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <select v-model="selectedAlg" @change="onAlgChange" class="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg px-3 py-2">
+              <option value="ML-DSA-44">ML-DSA-44 (k=4, l=4)</option>
+              <option value="ML-DSA-65">ML-DSA-65 (k=6, l=5) - BSrE</option>
+              <option value="ML-DSA-87">ML-DSA-87 (k=8, l=7)</option>
+            </select>
+            <button @click="runSigningTrace" :disabled="isTracing" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-purple-600/30 transition flex items-center space-x-2">
+              <span v-if="isTracing">Mengeksekusi...</span>
+              <span v-else>▶ Jalankan Tracing Komputasi</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Input Payload Card -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center gap-3 justify-between text-xs">
+          <div class="flex-1 w-full">
+            <label class="block text-slate-400 font-semibold mb-1">Payload Uji Laboratorium:</label>
+            <input type="text" v-model="testPayload" class="w-full bg-slate-950 border border-slate-700 text-purple-300 font-mono text-xs rounded-lg p-2 focus:outline-none">
+          </div>
+          <div class="text-right">
+            <span class="text-slate-400 block">Total Waktu Eksekusi:</span>
+            <span class="font-mono font-bold text-emerald-400 text-base">{{ traceResult ? traceResult.total_duration_ms : 0 }} ms</span>
+          </div>
+        </div>
+
+        <!-- 6-Stage Visual Stepper Pipeline -->
+        <div class="space-y-4">
+          <div v-for="step in (traceResult ? traceResult.steps : placeholderSteps)" :key="step.step_number" class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 hover:border-purple-500/40 transition">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3 mb-3">
+              <div class="flex items-center space-x-3">
+                <span class="w-7 h-7 rounded-full bg-purple-600/30 text-purple-300 border border-purple-500/40 flex items-center justify-center font-bold text-xs font-mono">
+                  0{{ step.step_number }}
+                </span>
+                <div>
+                  <h3 class="text-sm font-bold text-white">{{ step.name }}</h3>
+                  <span class="text-[11px] text-purple-400 font-mono">{{ step.phase }}</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-3">
+                <span class="font-mono text-xs text-slate-400 bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                  ⏱️ {{ step.duration_microsec.toFixed(2) }} µs
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  {{ step.status }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Math Formula & Explanation -->
+            <div class="space-y-2 text-xs">
+              <div class="p-2.5 bg-slate-950 rounded-lg border border-slate-800/80 font-mono text-emerald-300 flex items-center justify-between">
+                <span>{{ step.formula }}</span>
+                <span class="text-[10px] text-slate-500 font-sans">Formula FIPS 204</span>
+              </div>
+              <p class="text-slate-300 leading-relaxed">{{ step.description }}</p>
+
+              <!-- Snapshots Variables Grid -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2">
+                <div v-for="(val, key) in step.snapshots" :key="key" class="bg-slate-950/80 p-2 rounded border border-slate-800/60">
+                  <div class="text-[10px] text-slate-400 font-mono capitalize">{{ key.replace(/_/g, ' ') }}:</div>
+                  <div class="font-mono text-[11px] text-purple-300 font-semibold truncate" :title="val">{{ val }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: VISUALISASI ALUR VERIFIKASI ================= -->
+      <section v-if="activeTab === 'verify-trace'" class="space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Visualisasi Alur Verifikasi ML-DSA (FIPS 204 Algoritma 3)</h2>
+            <p class="text-sm text-slate-400">Inspeksi rekonstruksi komitmen matriks dan pengujian deteksi tampering bit-demi-bit</p>
+          </div>
+          <div class="flex gap-2">
+            <button @click="runVerifyTrace(false)" :disabled="isVerifyingTrace" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow transition">
+              ▶ Uji Sampel Sah (Valid)
+            </button>
+            <button @click="runVerifyTrace(true)" :disabled="isVerifyingTrace" class="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold rounded-lg shadow transition">
+              ⚠️ Uji Manipulasi Bit (Tampered)
+            </button>
+          </div>
+        </div>
+
+        <!-- Verification Verdict Header -->
+        <div v-if="verifyTraceResult" :class="verifyTraceResult.valid ? 'bg-emerald-950/40 border-emerald-500/40' : 'bg-rose-950/40 border-rose-500/40'" class="p-4 rounded-xl border flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl">{{ verifyTraceResult.valid ? '✅' : '❌' }}</span>
+            <div>
+              <div class="font-bold text-sm" :class="verifyTraceResult.valid ? 'text-emerald-300' : 'text-rose-300'">
+                {{ verifyTraceResult.valid ? 'HASIL VERIFIKASI: DOKUMEN SAH (100% LULUS)' : 'HASIL VERIFIKASI: INTEGRITAS TERPUTUS (DITOLAK)' }}
+              </div>
+              <div class="text-xs text-slate-300 mt-0.5">{{ verifyTraceResult.explanation }}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-400 block">Waktu Verifikasi:</span>
+            <span class="font-mono font-bold text-white text-sm">{{ verifyTraceResult.total_duration_ms }} ms</span>
+          </div>
+        </div>
+
+        <!-- Step-by-Step Verification Pipeline -->
+        <div v-if="verifyTraceResult" class="space-y-4">
+          <div v-for="step in verifyTraceResult.steps" :key="step.step_number" class="bg-slate-900 border rounded-xl p-5" :class="step.status === 'SUCCESS' ? 'border-slate-800' : 'border-rose-500/60 bg-rose-950/20'">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-2.5">
+              <div class="flex items-center space-x-3">
+                <span class="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs font-mono" :class="step.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'">
+                  0{{ step.step_number }}
+                </span>
+                <div>
+                  <h4 class="text-sm font-bold text-white">{{ step.name }}</h4>
+                  <span class="text-[10px] text-slate-400 font-mono">{{ step.phase }}</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="font-mono text-xs text-slate-400">{{ step.duration_microsec.toFixed(2) }} µs</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="step.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'">
+                  {{ step.status }}
+                </span>
+              </div>
+            </div>
+
+            <div class="space-y-2 text-xs">
+              <div class="p-2 bg-slate-950 rounded border border-slate-800 font-mono text-blue-300 text-[11px]">
+                {{ step.formula }}
+              </div>
+              <p class="text-slate-300">{{ step.description }}</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
+                <div v-for="(val, key) in step.snapshots" :key="key" class="bg-slate-950 p-2 rounded border border-slate-800/60">
+                  <span class="text-[10px] text-slate-400 block capitalize">{{ key.replace(/_/g, ' ') }}:</span>
+                  <span class="font-mono text-[11px] text-slate-200 truncate block">{{ val }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: ANATOMI STRUKTUR BYTE ================= -->
+      <section v-if="activeTab === 'bytes'" class="space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">Anatomi & Struktur Memori Byte Tanda Tangan FIPS 204</h2>
+          <p class="text-sm text-slate-400">Pembongkaran muatan byte signature ML-DSA-65 (3.309 Bytes) menjadi komponen matematis</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Byte Breakdown Cards -->
+          <div class="bg-slate-900 border border-blue-500/40 rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-sm text-blue-300">1. Tantangan Komitmen (c̃)</h3>
+              <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono text-xs font-bold">32 Bytes</span>
+            </div>
+            <p class="text-xs text-slate-300">Seed 256-bit hasil transformasi Fiat-Shamir (SHAKE-256) atas digest pesan dan nilai komitmen matriks.</p>
+            <div class="bg-slate-950 p-2.5 rounded font-mono text-[11px] text-blue-400 break-all border border-blue-900/40">
+              Offset: 0 s.d. 31 (256 bits)
+            </div>
+          </div>
+
+          <div class="bg-slate-900 border border-purple-500/40 rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-sm text-purple-300">2. Vektor Respons (z)</h3>
+              <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs font-bold">3.200 Bytes</span>
+            </div>
+            <p class="text-xs text-slate-300">Vektor rahasia bertopeng (l=5 polinomial, masing-masing 640 bytes). Memenuhi batas norma infinity.</p>
+            <div class="bg-slate-950 p-2.5 rounded font-mono text-[11px] text-purple-400 break-all border border-purple-900/40">
+              Offset: 32 s.d. 3.231 (l × 640 B)
+            </div>
+          </div>
+
+          <div class="bg-slate-900 border border-emerald-500/40 rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-sm text-emerald-300">3. Vektor Hint (h)</h3>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">77 Bytes</span>
+            </div>
+            <p class="text-xs text-slate-300">Petunjuk rekonsiliasi bit-tinggi carry bit untuk menjamin rekonstruksi deterministik di sisi verifikator.</p>
+            <div class="bg-slate-950 p-2.5 rounded font-mono text-[11px] text-emerald-400 break-all border border-emerald-900/40">
+              Offset: 3.232 s.d. 3.308 (ω + k = 77 B)
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw Hex Byte Stream View -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white">Inspeksi Aliran Byte (Hex Viewer):</h3>
+            <span class="font-mono text-xs text-slate-400">Total Ukuran: 3.309 Bytes (6.618 Karakter Hex)</span>
+          </div>
+          <div class="h-64 overflow-y-auto bg-slate-950 border border-slate-800 p-3 rounded-lg font-mono text-[11px] text-slate-300 leading-relaxed break-all">
+            {{ activeSigHex || 'Memuat contoh byte tanda tangan...' }}
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 4: KINERJA & STANDAR ================= -->
+      <section v-if="activeTab === 'bench'" class="space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">Pengujian Kinerja & Verifikasi Standar FIPS 204</h2>
+          <p class="text-sm text-slate-400">Pengujian empiris kecepatan penandatanganan dan pembuktian 18 kasus uji NIST ACVP</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 class="text-sm font-bold text-white mb-2">Latensi Operasi (Milidetik)</h3>
+            <p class="text-xs text-slate-400 mb-4">Target: =&lt; 2.000 ms (Realisasi: &lt; 1 ms)</p>
+            <div class="h-64">
+              <canvas id="procSpeedChart"></canvas>
+            </div>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 class="text-sm font-bold text-white mb-2">Ukuran Kunci & Signature (Bytes)</h3>
+            <p class="text-xs text-slate-400 mb-4">Overhead ukuran pascakuantum vs RSA klasik</p>
+            <div class="h-64">
+              <canvas id="procSizeChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-950 px-4 py-4 text-xs text-slate-500 text-center">
+      Laboratorium Riset Kriptografi Pascakuantum • Balai Besar Sertifikasi Elektronik (BSrE) BSSN • Sesuai NIST FIPS 204
+    </footer>
+  </div>
+
+  <script src="/process.js"></script>
+</body>
+</html>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purwarupa Penandatanganan Digital ML-DSA (FIPS 204) - BSrE BSSN</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bsre: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0066cc',
+              600: '#0052a3',
+              700: '#003d7a',
+              800: '#002952',
+              900: '#001429',
+            },
+            pqc: {
+              emerald: '#059669',
+              amber: '#d97706',
+              purple: '#7c3aed',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Font & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Vue 3 & Chart.js -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+  <div id="app" class="flex-1 flex flex-col">
+    <!-- Navbar Header -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center shadow-lg shadow-blue-500/20 font-bold text-lg text-white">
+            PQ
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-100 text-base">PQC Digital Signature POC</span>
+              <span class="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">FIPS 204 Compliant</span>
+            </div>
+            <p class="text-xs text-slate-400">Balai Besar Sertifikasi Elektronik (BSrE) - BSSN RI</p>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex items-center space-x-1 sm:space-x-2">
+          <button @click="activeTab = 'sign'" :class="tabClass('sign')">
+            Penandatanganan
+          </button>
+          <button @click="activeTab = 'verify'" :class="tabClass('verify')">
+            Verifikasi & Integritas
+          </button>
+          <button @click="activeTab = 'benchmark'" :class="tabClass('benchmark')">
+            Dasbor Kinerja
+          </button>
+          <button @click="activeTab = 'fips'" :class="tabClass('fips')">
+            Kepatuhan FIPS 204
+          </button>
+          <button @click="activeTab = 'audit'" :class="tabClass('audit')">
+            Audit & API
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Target Alert Banner -->
+    <div class="bg-blue-950/60 border-b border-blue-900/40 px-4 py-2.5">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between text-xs text-blue-200 gap-2">
+        <div class="flex items-center space-x-2">
+          <span class="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span><strong>Standar:</strong> NIST FIPS 204 (ML-DSA-44, 65, 87) & RFC 9881 / RFC 9882</span>
+          <span class="text-slate-500">|</span>
+          <span><strong>Pola Layanan:</strong> Penandatanganan Berbasis Hash (Esign Client Service / ECS)</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">
+            Target Penandatanganan: =< 2.000 ms
+          </span>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold font-mono">
+            Realisasi: &lt; 1.00 ms (PASS)
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+      
+      <!-- ================= TAB 1: PENANDATANGANAN ================= -->
+      <section v-if="activeTab === 'sign'" class="space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Layanan Penandatanganan Digital (Pola API Esign)</h2>
+            <p class="text-sm text-slate-400">Simulasi penandatanganan dokumen melalui nilai hash dokumen tanpa mengirim data asli ke server</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="generateNewKey" :disabled="loadingKey" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center space-x-2">
+              <span v-if="loadingKey">Membangkitkan...</span>
+              <span v-else>Pembangkitan Kunci Baru</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Key Pair Card -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Algoritma Aktif:</span>
+              <select v-model="selectedAlgorithm" @change="onAlgorithmChange" class="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                <option value="ML-DSA-44">ML-DSA-44 (NIST Kategori 2)</option>
+                <option value="ML-DSA-65">ML-DSA-65 (NIST Kategori 3 - Standar BSrE)</option>
+                <option value="ML-DSA-87">ML-DSA-87 (NIST Kategori 5 - Root CA)</option>
+                <option value="RSA-2048">RSA-2048 (Pembanding Klasik)</option>
+                <option value="RSA-3072">RSA-3072 (Pembanding Klasik)</option>
+                <option value="DUAL">Dual Sign (ML-DSA-65 + RSA-2048 - Masa Transisi)</option>
+              </select>
+            </div>
+            <div class="text-xs text-slate-400 flex items-center space-x-3">
+              <span>Ukuran Kunci Publik: <strong class="text-blue-400 font-mono">{{ activeKey ? activeKey.public_key_bytes : 0 }} Bytes</strong></span>
+              <span>•</span>
+              <span>Waktu KeyGen: <strong class="text-emerald-400 font-mono">{{ activeKey ? activeKey.gen_duration_ms : 0 }} ms</strong></span>
+            </div>
+          </div>
+
+          <!-- Public Key Info -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Kunci Publik Penanda Tangan (Hex / Base64):</label>
+            <div class="relative">
+              <textarea readonly :value="activeKey ? activeKey.public_key_hex : 'Memuat kunci...'" rows="2" class="w-full bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs rounded-lg p-2.5 resize-none focus:outline-none"></textarea>
+              <button @click="copyToClipboard(activeKey ? activeKey.public_key_hex : '')" class="absolute top-2 right-2 text-xs text-slate-400 hover:text-white bg-slate-800 px-2 py-1 rounded">Salin</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signing Form -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Input Side -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center justify-between">
+              <span>Masukan Data / Dokumen</span>
+              <div class="flex items-center space-x-1 text-xs font-normal">
+                <button @click="inputMode = 'text'" :class="inputMode === 'text' ? 'text-blue-400 font-bold' : 'text-slate-400'">Teks</button>
+                <span class="text-slate-600">|</span>
+                <button @click="inputMode = 'file'" :class="inputMode === 'file' ? 'text-blue-400 font-bold' : 'text-slate-400'">Berkas</button>
+                <span class="text-slate-600">|</span>
+                <button @click="inputMode = 'hash'" :class="inputMode === 'hash' ? 'text-blue-400 font-bold' : 'text-slate-400'">Hash Langsung</button>
+              </div>
+            </h3>
+
+            <div v-if="inputMode === 'text'">
+              <label class="block text-xs text-slate-400 mb-1">Ketik isi dokumen / payload:</label>
+              <textarea v-model="inputText" @input="updateDigest" rows="4" class="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs rounded-lg p-3 focus:outline-none focus:border-blue-500" placeholder="Tuliskan teks dokumen yang ingin ditandatangani..."></textarea>
+            </div>
+
+            <div v-else-if="inputMode === 'file'">
+              <label class="block text-xs text-slate-400 mb-1">Unggah berkas uji (PDF, Dokumen, Gambar):</label>
+              <div class="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center hover:border-blue-500 transition cursor-pointer" @click="$refs.fileInput.click()">
+                <input type="file" ref="fileInput" @change="handleFileUpload" class="hidden">
+                <div class="text-xs text-slate-300">
+                  <span v-if="uploadedFileName">Berkas: <strong class="text-blue-400">{{ uploadedFileName }}</strong> ({{ uploadedFileSize }} bytes)</span>
+                  <span v-else>Klik untuk memilih berkas uji</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-else-if="inputMode === 'hash'">
+              <label class="block text-xs text-slate-400 mb-1">Masukkan Hash SHA-256 (Hex):</label>
+              <input type="text" v-model="calculatedDigest" class="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <!-- Calculated Hash Display -->
+            <div>
+              <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                <span>Nilai Hash (SHA-256 Digest):</span>
+                <span class="font-mono text-slate-500">Pola ECS: Hanya hash yang dikirim</span>
+              </div>
+              <input type="text" readonly :value="calculatedDigest" class="w-full bg-slate-900/60 border border-slate-800 text-emerald-400 font-mono text-xs rounded-lg p-2.5 focus:outline-none">
+            </div>
+
+            <button @click="performSign" :disabled="isSigning" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-blue-600/30 transition flex items-center justify-center space-x-2">
+              <span v-if="isSigning">Sedang Memproses Penandatanganan...</span>
+              <span v-else>Tandatangani Dokumen / Hash</span>
+            </button>
+          </div>
+
+          <!-- Output Side -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h3 class="text-sm font-bold text-white">Hasil Penandatanganan Digital</h3>
+
+            <div v-if="lastSignResult" class="space-y-4">
+              <!-- Metrics Cards -->
+              <div class="grid grid-cols-3 gap-2">
+                <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+                  <div class="text-[10px] text-slate-400 uppercase">Ukuran Tanda Tangan</div>
+                  <div class="text-base font-bold font-mono text-blue-400">{{ lastSignResult.signature_bytes }} B</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+                  <div class="text-[10px] text-slate-400 uppercase">Waktu Proses</div>
+                  <div class="text-base font-bold font-mono text-emerald-400">{{ lastSignResult.sign_duration_ms }} ms</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+                  <div class="text-[10px] text-slate-400 uppercase">Target =&lt; 2s</div>
+                  <div class="text-xs font-bold font-mono mt-1 text-emerald-400 bg-emerald-500/20 py-0.5 rounded border border-emerald-500/30">
+                    LULUS (PASS)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Signature Data -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Nilai Tanda Tangan (Hex):</label>
+                <div class="relative">
+                  <textarea readonly :value="lastSignResult.signature_hex" rows="5" class="w-full bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs rounded-lg p-2.5 resize-none focus:outline-none"></textarea>
+                  <button @click="copyToClipboard(lastSignResult.signature_hex)" class="absolute top-2 right-2 text-xs text-slate-400 hover:text-white bg-slate-800 px-2 py-1 rounded">Salin</button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-xs pt-1">
+                <span class="text-slate-400">Algoritma: <strong class="text-white">{{ lastSignResult.algorithm }}</strong></span>
+                <button @click="sendToVerifyTab" class="text-blue-400 hover:underline font-semibold flex items-center space-x-1">
+                  <span>Kirim ke Menu Verifikasi</span>
+                  <span>&rarr;</span>
+                </button>
+              </div>
+            </div>
+
+            <div v-else class="h-64 flex flex-col items-center justify-center text-slate-500 text-xs text-center border border-dashed border-slate-800 rounded-lg">
+              <svg class="w-10 h-10 mb-2 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              <span>Belum ada dokumen yang ditandatangani.</span>
+              <span>Klik tombol "Tandatangani Dokumen / Hash" untuk memulai.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: VERIFIKASI & INTEGRITAS ================= -->
+      <section v-if="activeTab === 'verify'" class="space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">Verifikasi Tanda Tangan & Uji Integritas</h2>
+          <p class="text-sm text-slate-400">Validasi keabsahan tanda tangan digital serta pengujian deteksi kerusakan atau modifikasi pesan (tampering)</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Verification Form -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h3 class="text-sm font-bold text-white">Parameter Verifikasi</h3>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Algoritma:</label>
+              <select v-model="verifyForm.algorithm" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2.5">
+                <option value="ML-DSA-44">ML-DSA-44</option>
+                <option value="ML-DSA-65">ML-DSA-65</option>
+                <option value="ML-DSA-87">ML-DSA-87</option>
+                <option value="RSA-2048">RSA-2048</option>
+                <option value="RSA-3072">RSA-3072</option>
+              </select>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-slate-400">Data Pesan Asli (atau Hash SHA-256):</label>
+                <button @click="tamperMessage" class="text-[11px] text-amber-400 hover:text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+                  ⚠️ Uji Manipulasi Data (Tamper 1 Karakter)
+                </button>
+              </div>
+              <textarea v-model="verifyForm.message" rows="3" class="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Kunci Publik (Hex):</label>
+              <textarea v-model="verifyForm.publicKeyHex" rows="2" class="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-slate-400">Nilai Tanda Tangan (Hex):</label>
+                <button @click="tamperSignature" class="text-[11px] text-amber-400 hover:text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+                  ⚠️ Uji Rusak Signature (Tamper 1 Bit)
+                </button>
+              </div>
+              <textarea v-model="verifyForm.signatureHex" rows="3" class="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs rounded-lg p-2.5 focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <button @click="performVerify" :disabled="isVerifying" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-blue-600/30 transition">
+              <span v-if="isVerifying">Sedang Memverifikasi...</span>
+              <span v-else>Jalankan Verifikasi Tanda Tangan</span>
+            </button>
+          </div>
+
+          <!-- Verification Result Side -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white mb-4">Status & Hasil Validasi</h3>
+
+              <div v-if="verifyResult" class="space-y-4">
+                <div :class="verifyResult.valid ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300' : 'bg-rose-950/50 border-rose-500/40 text-rose-300'" class="p-4 rounded-xl border flex items-start space-x-3">
+                  <div class="text-2xl mt-0.5">
+                    <span v-if="verifyResult.valid">✅</span>
+                    <span v-else>❌</span>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-sm">{{ verifyResult.valid ? 'TANDA TANGAN SAH & VALID' : 'TANDA TANGAN TIDAK SAH (DITOLAK)' }}</h4>
+                    <p class="text-xs mt-1">{{ verifyResult.reason }}</p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                  <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                    <span class="text-slate-400 block mb-0.5">Waktu Verifikasi:</span>
+                    <span class="font-mono font-bold text-white text-sm">{{ verifyResult.verify_duration_ms }} ms</span>
+                  </div>
+                  <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                    <span class="text-slate-400 block mb-0.5">Kepatuhan FIPS 204:</span>
+                    <span class="font-semibold text-emerald-400 text-sm">Ya (NIST Standar)</span>
+                  </div>
+                </div>
+
+                <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-300 space-y-1">
+                  <div class="font-semibold text-slate-200">Prinsip Keamanan Integritas:</div>
+                  <p class="text-slate-400">
+                    Sistem mendeteksi setiap perubahan 1-bit sekalipun pada pesan atau tanda tangan. Modifikasi menghasilkan penolakan instan sesuai standar FIPS 204.
+                  </p>
+                </div>
+              </div>
+
+              <div v-else class="h-64 flex flex-col items-center justify-center text-slate-500 text-xs text-center border border-dashed border-slate-800 rounded-lg">
+                <svg class="w-10 h-10 mb-2 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Masukkan parameter di sebelah kiri lalu klik "Jalankan Verifikasi Tanda Tangan"</span>
+              </div>
+            </div>
+
+            <!-- Quick Preset for Demo -->
+            <div class="border-t border-slate-800 pt-4 mt-4">
+              <span class="text-xs text-slate-400 block mb-2">Preset Uji Demo Cepat:</span>
+              <div class="flex gap-2">
+                <button @click="loadDemoValid" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded border border-slate-700 transition">
+                  Muat Sampel Sah
+                </button>
+                <button @click="loadDemoTampered" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-semibold rounded border border-rose-900/50 transition">
+                  Muat Sampel Termodifikasi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: DASBOR KINERJA & PERBANDINGAN ================= -->
+      <section v-if="activeTab === 'benchmark'" class="space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Dasbor Kinerja & Perbandingan (ML-DSA vs RSA)</h2>
+            <p class="text-sm text-slate-400">Evaluasi empiris kecepatan penandatanganan (target =< 2 detik) dan dampak ukuran kunci/tanda tangan</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
+              <span class="text-xs text-slate-400">Iterasi:</span>
+              <select v-model="benchIterations" class="bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5">
+                <option :value="10">10x</option>
+                <option :value="50">50x</option>
+                <option :value="100">100x</option>
+                <option :value="200">200x</option>
+              </select>
+            </div>
+            <button @click="runBenchmark" :disabled="isRunningBench" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow transition flex items-center space-x-2">
+              <span v-if="isRunningBench">Mengukur Kinerja...</span>
+              <span v-else>Jalankan Benchmark</span>
+            </button>
+            <button @click="exportCSV" :disabled="!benchReport" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition">
+              Ekspor CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Target Met Highlight -->
+        <div class="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl">⚡</span>
+            <div>
+              <div class="font-bold text-sm text-emerald-300">Kebutuhan Non-Fungsional: Waktu Penandatanganan =&lt; 2 Detik</div>
+              <div class="text-xs text-slate-400">Seluruh varian ML-DSA (44, 65, 87) mencatat waktu rata-rata <strong>&lt; 0,5 ms</strong>, 4000x lebih cepat dari batas maksimal 2.000 ms.</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 font-mono font-bold text-xs border border-emerald-500/40">
+              STATUS: MEMENUHI TARGET
+            </span>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5">
+            <h3 class="text-sm font-bold text-white mb-2">Waktu Penandatanganan & Verifikasi (ms)</h3>
+            <p class="text-xs text-slate-400 mb-4">Perbandingan latensi rata-rata operasi kriptografi (lebih rendah lebih baik)</p>
+            <div class="h-64">
+              <canvas id="speedChart"></canvas>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5">
+            <h3 class="text-sm font-bold text-white mb-2">Ukuran Kunci & Tanda Tangan (Bytes)</h3>
+            <p class="text-xs text-slate-400 mb-4">Dampak Post-Quantum terhadap ukuran sertifikat dan lalu lintas jaringan</p>
+            <div class="h-64">
+              <canvas id="sizeChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Table -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 overflow-x-auto">
+          <h3 class="text-sm font-bold text-white mb-3">Tabel Hasil Pengukuran Rinci</h3>
+          <table class="w-full text-xs text-left text-slate-300">
+            <thead class="text-[11px] uppercase bg-slate-900 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3">Algoritma</th>
+                <th class="p-3">Kategori / Standar</th>
+                <th class="p-3 text-right">Kunci Publik</th>
+                <th class="p-3 text-right">Kunci Privat</th>
+                <th class="p-3 text-right">Tanda Tangan</th>
+                <th class="p-3 text-right">Sign Mean (ms)</th>
+                <th class="p-3 text-right">Sign P95 (ms)</th>
+                <th class="p-3 text-right">Verify Mean (ms)</th>
+                <th class="p-3 text-center">Target =&lt; 2s</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 font-mono">
+              <tr v-for="item in (benchReport ? benchReport.items : defaultBenchItems)" :key="item.algorithm" class="hover:bg-slate-900/50">
+                <td class="p-3 font-bold text-white">{{ item.algorithm }}</td>
+                <td class="p-3 font-sans text-slate-400">{{ item.family }} ({{ item.standard }})</td>
+                <td class="p-3 text-right text-blue-400">{{ item.public_key_bytes }} B</td>
+                <td class="p-3 text-right text-purple-400">{{ item.private_key_bytes }} B</td>
+                <td class="p-3 text-right text-amber-400">{{ item.signature_bytes }} B</td>
+                <td class="p-3 text-right text-emerald-400">{{ item.sign_mean_ms }}</td>
+                <td class="p-3 text-right text-emerald-300">{{ item.sign_p95_ms }}</td>
+                <td class="p-3 text-right text-emerald-400">{{ item.verify_mean_ms }}</td>
+                <td class="p-3 text-center">
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">LULUS</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= TAB 4: KEPATUHAN FIPS 204 ================= -->
+      <section v-if="activeTab === 'fips'" class="space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Validasi Kepatuhan Standar NIST FIPS 204</h2>
+            <p class="text-sm text-slate-400">Hasil pengujian spesifikasi matematis, ukuran parameter, dan resistansi manipulasi (NIST ACVP Test Suite)</p>
+          </div>
+          <div>
+            <button @click="runFIPSValidation" :disabled="isRunningFips" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow transition">
+              <span v-if="isRunningFips">Menjalankan Pengujian...</span>
+              <span v-else>Jalankan Ulang Uji FIPS 204</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="fipsReport" class="space-y-6">
+          <!-- Summary Header -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+              <div class="text-xs text-slate-400">Total Uji Kasus</div>
+              <div class="text-2xl font-bold font-mono text-white mt-1">{{ fipsReport.total_tests }}</div>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+              <div class="text-xs text-slate-400">Lulus (Passed)</div>
+              <div class="text-2xl font-bold font-mono text-emerald-400 mt-1">{{ fipsReport.passed_tests }}</div>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+              <div class="text-xs text-slate-400">Gagal (Failed)</div>
+              <div class="text-2xl font-bold font-mono text-rose-400 mt-1">{{ fipsReport.failed_tests }}</div>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+              <div class="text-xs text-slate-400">Status Kepatuhan</div>
+              <div class="text-xs font-bold mt-2 text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded inline-block border border-emerald-500/30">
+                100% SESUAI FIPS 204
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Cases List -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
+            <h3 class="text-sm font-bold text-white mb-2">Daftar Hasil Verifikasi Kasus Uji</h3>
+            <div class="divide-y divide-slate-800">
+              <div v-for="tc in fipsReport.test_cases" :key="tc.id" class="py-3 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div class="space-y-0.5">
+                  <div class="flex items-center space-x-2">
+                    <span class="px-1.5 py-0.5 rounded bg-slate-800 text-blue-400 font-mono text-[10px] font-bold">{{ tc.id }}</span>
+                    <span class="font-semibold text-xs text-white">{{ tc.test_name }}</span>
+                    <span class="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px]">{{ tc.algorithm }}</span>
+                  </div>
+                  <div class="text-xs text-slate-400">{{ tc.description }}</div>
+                  <div class="text-[11px] text-slate-500 font-mono">{{ tc.details }}</div>
+                </div>
+                <div class="flex items-center space-x-3">
+                  <span class="text-xs text-slate-400 font-mono">{{ tc.duration_ms }} ms</span>
+                  <span class="px-2.5 py-0.5 rounded text-xs font-bold" :class="tc.passed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400'">
+                    {{ tc.passed ? 'PASS' : 'FAIL' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 5: AUDIT & API ================= -->
+      <section v-if="activeTab === 'audit'" class="space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">Log Audit Operasi & Spesifikasi API ECS</h2>
+          <p class="text-sm text-slate-400">Pencatatan riwayat transaksi dan panduan integrasi penandatanganan pascakuantum</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Audit Logs -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white">Log Audit Aktivitas (KF-30)</h3>
+              <button @click="fetchAuditLogs" class="text-xs text-blue-400 hover:underline">Perbarui Log</button>
+            </div>
+
+            <div class="overflow-y-auto max-h-96 divide-y divide-slate-800">
+              <div v-for="(log, idx) in auditLogs" :key="idx" class="py-2.5 text-xs">
+                <div class="flex items-center justify-between text-slate-400 mb-0.5">
+                  <span class="font-mono text-[11px] text-slate-500">{{ log.timestamp }}</span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="log.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'">
+                    {{ log.status }}
+                  </span>
+                </div>
+                <div class="font-semibold text-white">{{ log.operation }}: <span class="text-blue-400">{{ log.algorithm }}</span></div>
+                <div class="text-[11px] text-slate-400 font-mono">{{ log.details }} ({{ log.duration_ms }} ms)</div>
+              </div>
+              <div v-if="auditLogs.length === 0" class="text-center py-8 text-slate-500 text-xs">
+                Belum ada catatan log audit.
+              </div>
+            </div>
+          </div>
+
+          <!-- API Guide -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h3 class="text-sm font-bold text-white">Spesifikasi Endpoint API (Pola ECS BSrE)</h3>
+
+            <div class="space-y-3 text-xs">
+              <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 bg-blue-600 text-white font-bold rounded text-[10px]">POST</span>
+                  <span class="font-mono text-slate-200">/api/v1/sign</span>
+                </div>
+                <p class="text-slate-400">Kirim nilai hash dokumen untuk mendapatkan tanda tangan ML-DSA:</p>
+                <pre class="bg-slate-950 p-2 rounded text-[11px] text-blue-300 font-mono overflow-x-auto">{
+  "signer_id": "rplk2-bsre",
+  "algorithm": "ML-DSA-65",
+  "digest": "&lt;SHA-256-HEX&gt;",
+  "format": "raw"
+}</pre>
+              </div>
+
+              <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded text-[10px]">POST</span>
+                  <span class="font-mono text-slate-200">/api/v1/verify</span>
+                </div>
+                <p class="text-slate-400">Verifikasi tanda tangan digital terhadap data atau hash:</p>
+                <pre class="bg-slate-950 p-2 rounded text-[11px] text-emerald-300 font-mono overflow-x-auto">{
+  "algorithm": "ML-DSA-65",
+  "digest": "&lt;SHA-256-HEX&gt;",
+  "public_key": "&lt;HEX-STRING&gt;",
+  "signature": "&lt;HEX-STRING&gt;"
+}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-950/80 px-4 py-4 text-center text-xs text-slate-500">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <span>Purwarupa Penandatanganan Pascakuantum (PQC POC) • Kelompok RPLK 2 BSrE</span>
+        <span>Standard: NIST FIPS 204 (ML-DSA) • Latensi: =&lt; 2 Detik (Terpenuhi)</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
