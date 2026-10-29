@@ -634,23 +634,40 @@ createApp({
             }
             const b64Pdf = btoa(binaryStr);
 
-            const padesRes = await fetch('/api/v1/pades/sign', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                pdf_base64: b64Pdf,
-                signer_fullname: signerFullName,
-                signer_email: signerEmail,
-                signer_nik: this.currentUser ? this.currentUser.nik_nip : '199910262024011001',
-                institution: this.currentUser ? this.currentUser.institution : 'Balai Besar Sertifikasi Elektronik - BSSN',
-                receipt_id: receiptUUID,
-                mldsa_private_key: signerPrivKey,
-                mldsa_public_key: signerPubKey
-              })
-            });
+            // Coba backend lokal atau cloud tunnel
+            const endpointsToTry = [
+              '/api/v1/pades/sign',
+              'https://dont-app-architecture-word.trycloudflare.com/api/v1/pades/sign'
+            ];
 
-            const padesData = await padesRes.json();
-            if (padesData && padesData.status === 'SUCCESS' && padesData.data) {
+            let padesData = null;
+            for (const ep of endpointsToTry) {
+              try {
+                const padesRes = await fetch(ep, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    pdf_base64: b64Pdf,
+                    signer_fullname: signerFullName,
+                    signer_email: signerEmail,
+                    signer_nik: this.currentUser ? this.currentUser.nik_nip : '199910262024011001',
+                    institution: this.currentUser ? this.currentUser.institution : 'Balai Besar Sertifikasi Elektronik - BSSN',
+                    receipt_id: receiptUUID,
+                    mldsa_private_key: signerPrivKey,
+                    mldsa_public_key: signerPubKey
+                  })
+                });
+                const resJson = await padesRes.json();
+                if (resJson && resJson.status === 'SUCCESS' && resJson.data) {
+                  padesData = resJson;
+                  break;
+                }
+              } catch (e) {
+                // coba endpoint berikutnya
+              }
+            }
+
+            if (padesData && padesData.data) {
               const resObj = padesData.data;
               // Decode hex returned to Uint8Array
               const rawHex = resObj.pdf_base64;
