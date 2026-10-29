@@ -1,0 +1,4 @@
+# Arahkan root langsung ke portal produksi TTE
+/    /production.html   200
+/prod /production.html  200
+/lab  /index.html       200
