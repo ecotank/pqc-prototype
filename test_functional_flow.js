@@ -121,7 +121,7 @@ async function main() {
   // c. PKCS#7 Extraction & OpenSSL Verification
   const contentsMatch = str.match(/\/Contents\s*<([0-9A-Fa-f]+)>/);
   if (!contentsMatch) throw new Error('/Contents tidak ditemukan!');
-  const pkcs7Hex = contentsMatch[1].replace(/0+$/, '');
+  const pkcs7Hex = contentsMatch[1].substring(0, signData.pkcs7_signature_hex.length);
   fs.writeFileSync('test_functional_pkcs7.p7s', Buffer.from(pkcs7Hex, 'hex'));
 
   const certsText = execSync('openssl pkcs7 -in test_functional_pkcs7.p7s -inform DER -print_certs -text', { encoding: 'utf-8' });

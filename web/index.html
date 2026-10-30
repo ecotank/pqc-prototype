@@ -87,6 +87,8 @@
             <div class="text-[11px] font-bold tracking-widest text-blue-400 uppercase">Badan Siber dan Sandi Negara</div>
             <h1 class="text-base font-extrabold text-white leading-tight">Balai Besar Sertifikasi Elektronik (BSrE)</h1>
             <div class="text-xs text-slate-400">Portal Layanan Tanda Tangan Elektronik Pascakuantum (PQC-TTE)</div>
+          </div>
+        </div>
         <div class="flex items-center space-x-2">
           <nav class="flex items-center space-x-1 sm:space-x-2">
             <button @click="activeTab = 'dashboard'" :class="tabClass('dashboard')">
@@ -720,8 +722,6 @@
                       </span>
                     </div>
 
-                  </div>
-
                   <!-- Menu Lipat: Input Numerik Presisi Pixel (Opsional untuk Fine-Tuning) -->
                   <details class="group pt-1 border-t border-slate-800/80">
                     <summary class="cursor-pointer text-[11px] text-slate-400 hover:text-slate-300 font-medium flex items-center justify-between py-1 transition select-none">
@@ -901,6 +901,7 @@
             </div>
           </div>
         </div>
+          </div>
         </template>
       </section>
 
@@ -1097,7 +1098,7 @@
     </main>
 
     <!-- Global Auth Modal -->
-    <div v-if="showAuthModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div v-if="showAuthModal" v-cloak style="display: none;" :style="{ display: showAuthModal ? 'flex' : 'none' }" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
       <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 relative">
         <button @click="closeAuthModal" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">✕</button>
 
@@ -1157,7 +1158,7 @@
     <!-- ======================================================== -->
     <!-- WIZARD REGISTRASI & AKTIVASI TTE RESMI (4 LANGKAH BSrE)  -->
     <!-- ======================================================== -->
-    <div v-if="showOnboardingModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+    <div v-if="showOnboardingModal" v-cloak style="display: none;" :style="{ display: showOnboardingModal ? 'flex' : 'none' }" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
       <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 relative my-auto">
         <button @click="closeOnboardingWizard" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl leading-none">&times;</button>
 
@@ -1494,11 +1495,9 @@
 
       </div>
     </div>
-      </div>
-    </div>
 
     <!-- Security Authorization Modal (Passphrase, Face Cam, & Passkey) -->
-    <div v-if="showSecurityModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div v-if="showSecurityModal" v-cloak style="display: none;" :style="{ display: showSecurityModal ? 'flex' : 'none' }" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
       <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 relative">
         <button @click="closeSecurityModal" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">&times;</button>
 
@@ -1518,8 +1517,8 @@
             <span>Pejabat Penandatangan:</span>
             <span class="text-emerald-400 font-semibold">TTE Sah BSrE</span>
           </div>
-          <div class="font-bold text-white">{{ currentUser ? currentUser.fullname : 'Satria Alba Pramasha, S.Tr.Kom.' }}</div>
-          <div class="text-[11px] text-slate-400">{{ currentUser ? currentUser.institution : 'Badan Siber dan Sandi Negara' }} &bull; NIK: {{ currentUser ? currentUser.nik_nip : '199910262024011001' }}</div>
+          <div class="font-bold text-white" v-text="currentUser ? currentUser.fullname : 'Satria Alba Pramasha, S.Tr.Kom.'"></div>
+          <div class="text-[11px] text-slate-400" v-text="(currentUser ? currentUser.institution : 'Badan Siber dan Sandi Negara') + ' • NIK: ' + (currentUser ? currentUser.nik_nip : '199910262024011001')"></div>
         </div>
 
         <!-- Method Tabs (3 Opsi: Passphrase, Webcam Face Scan, Passkey) -->
@@ -1543,9 +1542,7 @@
 
         <!-- Tab 1: Passphrase / PIN Form -->
         <div v-if="securityAuthTab === 'passphrase'" class="space-y-4">
-          <div v-if="securityAuthError" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
-            {{ securityAuthError }}
-          </div>
+          <div v-if="securityAuthError" v-text="securityAuthError" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs"></div>
 
           <div class="space-y-1.5">
             <label class="block text-xs font-medium text-slate-300">
@@ -1579,9 +1576,7 @@
 
         <!-- Tab 2: Pindai Wajah (Webcam Browser Bebas Sensor Windows Hello) -->
         <div v-if="securityAuthTab === 'face'" class="space-y-3.5">
-          <div v-if="securityAuthError" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
-            {{ securityAuthError }}
-          </div>
+          <div v-if="securityAuthError" v-text="securityAuthError" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs"></div>
 
           <!-- Wadah Layar Video Webcam -->
           <div class="relative w-full h-52 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner">
@@ -1606,9 +1601,7 @@
                    :class="faceScanning ? 'border-emerald-400 shadow-[0_0_25px_rgba(52,211,153,0.6)] animate-pulse' : 'border-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.3)]'">
                 <div v-if="faceScanning" class="w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce mt-10"></div>
               </div>
-              <span class="mt-2 text-[10px] font-mono font-bold bg-slate-950/90 px-2 py-0.5 rounded text-blue-300 border border-blue-500/30">
-                {{ faceScanning ? 'Memindai Kontur Wajah...' : 'Posisikan Wajah di Dalam Bingkai' }}
-              </span>
+              <span v-text="faceScanning ? 'Memindai Kontur Wajah...' : 'Posisikan Wajah di Dalam Bingkai'" class="mt-2 text-[10px] font-mono font-bold bg-slate-950/90 px-2 py-0.5 rounded text-blue-300 border border-blue-500/30"></span>
             </div>
 
             <!-- Overlay Sukses Verifikasi -->
@@ -1647,9 +1640,7 @@
 
         <!-- Tab 3: Passkey (FIDO2 / WebAuthn) -->
         <div v-if="securityAuthTab === 'passkey'" class="space-y-4">
-          <div v-if="securityAuthError" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
-            {{ securityAuthError }}
-          </div>
+          <div v-if="securityAuthError" v-text="securityAuthError" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs"></div>
 
           <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2 text-center">
             <div class="text-3xl animate-bounce">👆</div>
@@ -1688,7 +1679,7 @@
   </div>
 
   <script src="/vendor/bsre-pades-template.js"></script>
-  <script src="/pdf-signer.js?v=20261029-2"></script>
+  <script src="/pdf-signer.js?v=20261030-pass1"></script>
   <script src="/official-users.js"></script>
   <script src="/prod.js?v=20261030-onboard1"></script>
 </body>
