@@ -424,8 +424,8 @@
             <button @click="authModalTab = 'login'" :class="authModalTab === 'login' ? 'border-b-2 border-blue-500 text-blue-400 font-bold' : 'text-slate-400'" class="flex-1 py-2.5 text-xs text-center transition">
               Masuk Akun Resmi
             </button>
-            <button @click="authModalTab = 'register'" :class="authModalTab === 'register' ? 'border-b-2 border-blue-500 text-blue-400 font-bold' : 'text-slate-400'" class="flex-1 py-2.5 text-xs text-center transition">
-              Daftar Akun Baru
+            <button @click="openOnboardingWizard()" class="flex-1 py-2.5 text-xs text-center text-slate-400 hover:text-blue-400 font-semibold transition">
+              Daftar Akun Baru (OTP & Wajah)
             </button>
           </div>
 
@@ -446,43 +446,27 @@
               <span v-if="loginForm.loading">Memverifikasi Kredensial...</span>
               <span v-else>Masuk ke Layanan TTE</span>
             </button>
+            <div class="text-center pt-1 border-t border-slate-800/80">
+              <span class="text-xs text-slate-400">Pengguna baru belum bersertifikat? </span>
+              <button type="button" @click="openOnboardingWizard()" class="text-xs text-blue-400 hover:underline font-bold">
+                Registrasi & Aktivasi Sertifikat TTE &rarr;
+              </button>
+            </div>
           </div>
 
-          <!-- Tab 3: Register Akun Publik Baru -->
-          <div v-if="authModalTab === 'register'" class="space-y-3">
-            <div v-if="registerForm.error" class="p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
-              {{ registerForm.error }}
+          <!-- Tab 2: Pendaftaran Akun Baru (Wizard 4 Tahap) -->
+          <div v-if="authModalTab === 'register'" class="space-y-4 text-center p-4 bg-slate-900/60 rounded-xl border border-slate-800">
+            <div class="w-12 h-12 mx-auto rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-2xl font-bold">
+              📝
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Lengkap (Sesuai KTP/Identitas):</label>
-              <input type="text" v-model="registerForm.fullname" placeholder="Contoh: Rian Pratama" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2.5 focus:border-blue-500 focus:outline-none">
+              <h4 class="text-sm font-bold text-white">Pendaftaran Pengguna Baru Bersertifikat BSrE</h4>
+              <p class="text-xs text-slate-300 mt-1 max-w-sm mx-auto">
+                Proses 4 tahap: Verifikasi Email OTP &bull; Identitas KTP & Spesimen &bull; Passphrase & Passkey Wajah &bull; Penerbitan Kunci ML-DSA-65.
+              </p>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">NIK / NIP:</label>
-                <input type="text" v-model="registerForm.nik_nip" placeholder="Nomor Induk Kependudukan" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2.5 focus:border-blue-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Instansi / Profesi:</label>
-                <input type="text" v-model="registerForm.institution" placeholder="Contoh: Swasta / Universitas" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2.5 focus:border-blue-500 focus:outline-none">
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Username Baru:</label>
-                <input type="text" v-model="registerForm.username" placeholder="username" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2.5 focus:border-blue-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Kata Sandi:</label>
-                <input type="password" v-model="registerForm.password" placeholder="Kata sandi..." class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2.5 focus:border-blue-500 focus:outline-none">
-              </div>
-            </div>
-            <div class="text-[11px] text-blue-400 bg-blue-950/40 p-2.5 rounded border border-blue-900/40">
-              ℹ️ Pendaftaran akun publik akan secara otomatis membangkitkan pasangan kunci pascakuantum <strong>ML-DSA-65 (NIST FIPS 204)</strong> yang disimpan aman di sistem.
-            </div>
-            <button @click="register()" :disabled="registerForm.loading" class="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg transition shadow-md">
-              <span v-if="registerForm.loading">Mendaftarkan & Membangkitkan Kunci ML-DSA-65...</span>
-              <span v-else>Daftarkan Akun & Kunci Pascakuantum</span>
+            <button @click="openOnboardingWizard()" class="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1.5">
+              <span>Mulai Pendaftaran & Aktivasi Sertifikat &rarr;</span>
             </button>
           </div>
         </div>
@@ -1119,8 +1103,8 @@
           <button @click="authModalTab = 'login'" :class="authModalTab === 'login' ? 'border-b-2 border-blue-500 text-blue-400 font-bold' : 'text-slate-400'" class="flex-1 py-2 text-center transition">
             Masuk Akun
           </button>
-          <button @click="authModalTab = 'register'" :class="authModalTab === 'register' ? 'border-b-2 border-blue-500 text-blue-400 font-bold' : 'text-slate-400'" class="flex-1 py-2 text-center transition">
-            Daftar Baru
+          <button @click="openOnboardingWizard()" class="flex-1 py-2 text-center text-slate-400 hover:text-blue-400 font-semibold transition">
+            Daftar Baru (OTP & Wajah)
           </button>
         </div>
 
@@ -1141,42 +1125,349 @@
             <span v-if="loginForm.loading">Memverifikasi Kredensial...</span>
             <span v-else>Masuk ke Layanan TTE</span>
           </button>
+          <div class="text-center pt-2 border-t border-slate-800/80">
+            <span class="text-[11px] text-slate-400">Pengguna baru belum bersertifikat? </span>
+            <button type="button" @click="openOnboardingWizard()" class="text-[11px] text-blue-400 hover:underline font-bold">
+              Registrasi 4 Tahap & Dapatkan Kunci TTE &rarr;
+            </button>
+          </div>
         </div>
 
-        <!-- Tab: Register -->
-        <div v-if="authModalTab === 'register'" class="space-y-2.5 max-h-80 overflow-y-auto">
-          <div v-if="registerForm.error" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
-            {{ registerForm.error }}
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Lengkap:</label>
-            <input type="text" v-model="registerForm.fullname" placeholder="Contoh: Rian Pratama" class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-lg p-2 focus:border-blue-500 focus:outline-none">
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">NIK/NIP:</label>
-              <input type="text" v-model="registerForm.nik_nip" placeholder="NIK/NIP" class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-lg p-2 focus:border-blue-500 focus:outline-none">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Instansi:</label>
-              <input type="text" v-model="registerForm.institution" placeholder="Pekerjaan" class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-lg p-2 focus:border-blue-500 focus:outline-none">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Username:</label>
-              <input type="text" v-model="registerForm.username" placeholder="Username" class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-lg p-2 focus:border-blue-500 focus:outline-none">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Kata Sandi:</label>
-              <input type="password" v-model="registerForm.password" placeholder="Sandi" class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-lg p-2 focus:border-blue-500 focus:outline-none">
-            </div>
-          </div>
-          <button @click="register()" :disabled="registerForm.loading" class="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg transition shadow-md mt-2">
-            <span v-if="registerForm.loading">Mendaftarkan Kunci ML-DSA-65...</span>
-            <span v-else>Daftar & Bangkitkan Kunci PQC</span>
+        <!-- Tab: Register Redirect to Wizard -->
+        <div v-if="authModalTab === 'register'" class="space-y-3 text-center py-2">
+          <p class="text-xs text-slate-300">Pendaftaran akun resmi mewajibkan verifikasi OTP email, profil KTP, spesimen tanda tangan, serta pendaftaran wajah.</p>
+          <button @click="openOnboardingWizard()" class="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg transition shadow-md">
+            Mulai Registrasi & Verifikasi OTP &rarr;
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- WIZARD REGISTRASI & AKTIVASI TTE RESMI (4 LANGKAH BSrE)  -->
+    <!-- ======================================================== -->
+    <div v-if="showOnboardingModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 relative my-auto">
+        <button @click="closeOnboardingWizard" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+
+        <!-- Stepper Progress Header -->
+        <div class="border-b border-slate-800 pb-4">
+          <div class="flex items-center space-x-2 text-xs text-blue-400 font-semibold mb-1">
+            <span>Balai Besar Sertifikasi Elektronik - BSSN</span>
+            <span>&bull;</span>
+            <span class="text-slate-400">Penerbitan Akun TTE Pascakuantum</span>
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-white">Registrasi & Aktivasi Kunci ML-DSA-65</h3>
+          
+          <!-- Step Indicator Bar (1 to 4) -->
+          <div class="grid grid-cols-4 gap-2 mt-4">
+            <div class="flex flex-col items-center">
+              <div :class="onboarding.step >= 1 ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-500/50' : 'bg-slate-800 text-slate-500'" 
+                   class="w-7 h-7 rounded-full flex items-center justify-center text-xs transition">
+                <span v-if="onboarding.step > 1">✓</span>
+                <span v-else>1</span>
+              </div>
+              <span class="text-[9.5px] font-medium mt-1 truncate" :class="onboarding.step >= 1 ? 'text-blue-400 font-semibold' : 'text-slate-500'">1. Email & OTP</span>
+            </div>
+
+            <div class="flex flex-col items-center">
+              <div :class="onboarding.step >= 2 ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-500/50' : 'bg-slate-800 text-slate-500'" 
+                   class="w-7 h-7 rounded-full flex items-center justify-center text-xs transition">
+                <span v-if="onboarding.step > 2">✓</span>
+                <span v-else>2</span>
+              </div>
+              <span class="text-[9.5px] font-medium mt-1 truncate" :class="onboarding.step >= 2 ? 'text-blue-400 font-semibold' : 'text-slate-500'">2. KTP & Spesimen</span>
+            </div>
+
+            <div class="flex flex-col items-center">
+              <div :class="onboarding.step >= 3 ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-500/50' : 'bg-slate-800 text-slate-500'" 
+                   class="w-7 h-7 rounded-full flex items-center justify-center text-xs transition">
+                <span v-if="onboarding.step > 3">✓</span>
+                <span v-else>3</span>
+              </div>
+              <span class="text-[9.5px] font-medium mt-1 truncate" :class="onboarding.step >= 3 ? 'text-blue-400 font-semibold' : 'text-slate-500'">3. Sandi & Wajah</span>
+            </div>
+
+            <div class="flex flex-col items-center">
+              <div :class="onboarding.step >= 4 ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-500/50' : 'bg-slate-800 text-slate-500'" 
+                   class="w-7 h-7 rounded-full flex items-center justify-center text-xs transition">
+                <span>4</span>
+              </div>
+              <span class="text-[9.5px] font-medium mt-1 truncate" :class="onboarding.step >= 4 ? 'text-emerald-400 font-semibold' : 'text-slate-500'">4. Sertifikat Siap</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Error Alert -->
+        <div v-if="onboarding.error" class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
+          {{ onboarding.error }}
+        </div>
+
+        <!-- ============================================== -->
+        <!-- STEP 1: REGISTRASI & VERIFIKASI KODE OTP EMAIL -->
+        <!-- ============================================== -->
+        <div v-if="onboarding.step === 1" class="space-y-4">
+          <p class="text-xs text-slate-300">
+            Daftarkan email kedinasan atau email pribadi Anda. Kode verifikasi OTP akan dikirimkan untuk memastikan keabsahan identitas kontak.
+          </p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Alamat Email:</label>
+              <input type="email" v-model="onboarding.email" :disabled="onboarding.otpSent" placeholder="nama@instansi.go.id atau nama@gmail.com" 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none disabled:opacity-60">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Kata Sandi Akun Baru:</label>
+              <input type="password" v-model="onboarding.password" :disabled="onboarding.otpSent" placeholder="Minimal 6 karakter..." 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none disabled:opacity-60">
+            </div>
+          </div>
+
+          <div v-if="!onboarding.otpSent">
+            <button @click="sendOnboardingOTP" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1.5">
+              <span>✉️ Kirim Kode OTP Verifikasi</span>
+            </button>
+          </div>
+
+          <div v-else class="space-y-4 pt-1">
+            <div class="p-3 bg-blue-950/60 border border-blue-800/80 rounded-xl space-y-1.5 shadow-inner">
+              <div class="flex items-center space-x-2 text-xs font-bold text-blue-300">
+                <span class="animate-pulse">🔔</span>
+                <span>Pesan Masuk: Layanan Notifikasi BSrE</span>
+              </div>
+              <p class="text-[11px] text-slate-200 font-mono bg-slate-950/80 p-2 rounded border border-blue-900/50">
+                {{ onboarding.simulatedInboxMessage }}
+              </p>
+              <div class="text-[10px] text-slate-400">
+                *Simulasi pengiriman email langsung (Kode OTP resmi telah diterbitkan).
+              </div>
+            </div>
+
+            <div class="space-y-1.5 text-center">
+              <label class="block text-xs font-semibold text-slate-300">Masukkan 6-Digit Kode OTP:</label>
+              <input type="text" v-model="onboarding.otpInput" maxlength="6" @keyup.enter="verifyOnboardingOTP" placeholder="Contoh: 849201" 
+                     class="w-48 mx-auto text-center font-mono font-bold tracking-widest text-lg bg-slate-950 border-2 border-blue-500/80 text-white rounded-xl p-2 focus:outline-none focus:border-blue-400">
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+              <span>Waktu tunggu kirim ulang:</span>
+              <span v-if="onboarding.otpTimer > 0" class="font-mono text-amber-400">{{ onboarding.otpTimer }} detik</span>
+              <button v-else @click="resendOnboardingOTP" class="text-blue-400 hover:underline font-semibold">Kirim Ulang OTP</button>
+            </div>
+
+            <button @click="verifyOnboardingOTP" class="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1.5">
+              <span>Verifikasi OTP & Lanjutkan Tahap 2 &rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- STEP 2: IDENTITAS KTP & SPESIMEN TANDA TANGAN  -->
+        <!-- ============================================== -->
+        <div v-if="onboarding.step === 2" class="space-y-4">
+          <p class="text-xs text-slate-300">
+            Lengkapi data diri resmi sesuai KTP dan atur spesimen tanda tangan visual yang akan disematkan ke berkas dokumen PDF Anda.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Lengkap (Sesuai KTP / SK Kedinasan):</label>
+              <input type="text" v-model="onboarding.fullname" placeholder="Contoh: Rian Pratama, S.Kom." 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Nomor Induk Kependudukan (NIK):</label>
+              <input type="text" v-model="onboarding.nik" placeholder="16 Digit NIK KTP..." 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Instansi / Unit Kerja:</label>
+              <input type="text" v-model="onboarding.institution" placeholder="Contoh: Dinas Kominfo / Publik" 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Pengaturan Spesimen Tanda Tangan -->
+          <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">Spesimen Tanda Tangan Visual:</span>
+              <div class="flex space-x-1 text-[10px]">
+                <button type="button" @click="onboarding.specimenMode = 'draw'; $nextTick(() => initSignatureCanvas())" 
+                        :class="onboarding.specimenMode === 'draw' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-400'" 
+                        class="px-2 py-0.5 rounded transition">
+                  ✍️ Goreskan di Layar
+                </button>
+                <button type="button" @click="onboarding.specimenMode = 'upload'" 
+                        :class="onboarding.specimenMode === 'upload' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-400'" 
+                        class="px-2 py-0.5 rounded transition">
+                  📁 Unggah Berkas
+                </button>
+              </div>
+            </div>
+
+            <!-- Opsi A: Goresan Kanvas Langsung -->
+            <div v-show="onboarding.specimenMode === 'draw'" class="space-y-1.5">
+              <div class="relative bg-white rounded-lg border-2 border-dashed border-slate-600 overflow-hidden h-28 flex items-center justify-center">
+                <canvas ref="sigCanvas" width="480" height="112" class="w-full h-full cursor-crosshair touch-none"></canvas>
+                <div v-if="!onboarding.specimenImage" class="absolute pointer-events-none text-slate-400 text-[11px] italic">
+                  Goreskan tanda tangan Anda di sini menggunakan mouse atau layar sentuh
+                </div>
+              </div>
+              <div class="flex justify-between items-center text-[10px]">
+                <span class="text-slate-400">Goresan otomatis dikonversi ke gambar PNG transparan</span>
+                <button type="button" @click="clearSignatureCanvas" class="text-rose-400 hover:text-rose-300 font-semibold">
+                  Hapus Goresan (Clear)
+                </button>
+              </div>
+            </div>
+
+            <!-- Opsi B: Unggah Berkas Gambar -->
+            <div v-show="onboarding.specimenMode === 'upload'" class="space-y-2">
+              <input type="file" accept="image/png,image/jpeg" @change="handleOnboardingSpecimenUpload" 
+                     class="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500">
+              <div v-if="onboarding.specimenImage" class="p-2 bg-white rounded flex items-center justify-center h-20 max-w-[200px] border border-slate-300 mx-auto">
+                <img :src="onboarding.specimenImage" class="max-h-full object-contain">
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-1 flex space-x-2">
+            <button @click="onboarding.step = 1" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition">
+              &larr; Kembali
+            </button>
+            <button @click="saveOnboardingProfile" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1">
+              <span>Simpan & Atur Keamanan Kunci &rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ==================================================== -->
+        <!-- STEP 3: ATUR PASSPHRASE & PASSKEY VERIFIKASI WAJAH   -->
+        <!-- ==================================================== -->
+        <div v-if="onboarding.step === 3" class="space-y-4">
+          <p class="text-xs text-slate-300">
+            Kunci privat pascakuantum Anda diamankan ganda oleh <b>Passphrase Kriptografi</b> dan <b>Passkey Biometrik Wajah</b>.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Passphrase Sertifikat Baru:</label>
+              <input type="password" v-model="onboarding.passphrase" placeholder="Minimal 6 karakter..." 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Konfirmasi Passphrase:</label>
+              <input type="password" v-model="onboarding.passphraseConfirm" placeholder="Ulangi passphrase..." 
+                     class="w-full bg-slate-950 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-blue-500 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Perekaman Master Biometrik Wajah -->
+          <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">Perekaman Master Biometrik Wajah (Passkey):</span>
+              <span v-if="onboarding.faceMasterSnapshot" class="text-[10px] text-emerald-400 font-bold">✓ Wajah Terdaftar</span>
+            </div>
+
+            <!-- Wadah Kamera Video Webcam Onboarding -->
+            <div class="relative w-full h-44 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center">
+              <video ref="onboardingVideo" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100" 
+                     v-show="onboarding.faceCameraActive && !onboarding.faceMasterSnapshot"></video>
+
+              <img v-if="onboarding.faceMasterSnapshot" :src="onboarding.faceMasterSnapshot" class="w-full h-full object-cover transform -scale-x-100">
+
+              <div v-if="!onboarding.faceCameraActive && !onboarding.faceMasterSnapshot" class="text-center p-3 space-y-1.5">
+                <div class="text-2xl text-slate-500">📷</div>
+                <p class="text-[11px] text-slate-300">Kamera siap merekam kontur wajah Anda.</p>
+                <button type="button" @click="startOnboardingCamera" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition">
+                  Nyalakan Kamera
+                </button>
+              </div>
+
+              <!-- Reticle Oval Perekaman -->
+              <div v-if="onboarding.faceCameraActive && !onboarding.faceMasterSnapshot" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                <div class="w-28 h-36 rounded-[50%] border-2 border-dashed"
+                     :class="onboarding.faceScanning ? 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.6)] animate-pulse' : 'border-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.3)]'">
+                </div>
+                <span class="mt-1 text-[9px] font-mono bg-slate-950/80 px-1.5 py-0.2 rounded text-blue-300">
+                  {{ onboarding.faceScanning ? 'Merekam Biometrik...' : 'Posisikan Wajah' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex space-x-2">
+              <button v-if="onboarding.faceCameraActive && !onboarding.faceMasterSnapshot" 
+                      type="button" @click="captureOnboardingFace" :disabled="onboarding.faceScanning"
+                      class="flex-1 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg transition shadow flex items-center justify-center space-x-1">
+                <span>📸 Rekam Wajah Master</span>
+              </button>
+              <button v-if="onboarding.faceMasterSnapshot" 
+                      type="button" @click="onboarding.faceMasterSnapshot = null; startOnboardingCamera()"
+                      class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition">
+                Rekam Ulang
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-1 flex space-x-2">
+            <button @click="onboarding.step = 2" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition">
+              &larr; Kembali
+            </button>
+            <button @click="submitOnboardingSecurity" :disabled="onboarding.isGeneratingKeys" 
+                    class="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1.5">
+              <span v-if="onboarding.isGeneratingKeys">Membangkitkan Pasangan Kunci ML-DSA-65...</span>
+              <span v-else>Aktifkan Kunci & Terbitkan Sertifikat &rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- STEP 4: SERTIFIKAT TTE PASCAKUANTUM TERBIT     -->
+        <!-- ============================================== -->
+        <div v-if="onboarding.step === 4" class="space-y-4 text-center">
+          <div class="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-3xl text-emerald-400 shadow-lg">
+            ✓
+          </div>
+
+          <div class="space-y-1">
+            <h4 class="text-base font-bold text-white uppercase tracking-wide">Sertifikat Elektronik Pascakuantum Diterbitkan</h4>
+            <p class="text-xs text-slate-300">
+              Identitas Anda telah diverifikasi secara penuh oleh Sub-CA Pelayanan TTE Pascakuantum BSrE BSSN.
+            </p>
+          </div>
+
+          <!-- Kartu Kredensial Resmi -->
+          <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2 text-left text-xs">
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Pemilik Sertifikat:</span>
+              <span class="font-bold text-white">{{ currentUser ? currentUser.fullname : onboarding.fullname }}</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Identitas NIK:</span>
+              <span class="font-mono text-slate-200">{{ currentUser ? currentUser.nik_nip : onboarding.nik }}</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Standar Algoritma:</span>
+              <span class="font-bold text-blue-400">NIST FIPS 204 ML-DSA-65 (Level 3)</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Metode Otorisasi Aktif:</span>
+              <span class="text-emerald-400 font-semibold">Passphrase Kripto + Biometrik Wajah</span>
+            </div>
+            <div class="flex justify-between pt-1">
+              <span class="text-slate-400">Otoritas Sertifikasi (CA):</span>
+              <span class="text-indigo-300 font-medium">BSrE BSSN Root CA / Sub-CA PQC</span>
+            </div>
+          </div>
+
+          <button @click="finishOnboarding" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-blue-600/30">
+            ✍️ Selesai & Mulai Menandatangani Dokumen
+          </button>
+        </div>
+
+      </div>
+    </div>
       </div>
     </div>
 
@@ -1373,6 +1664,6 @@
   <script src="/vendor/bsre-pades-template.js"></script>
   <script src="/pdf-signer.js?v=20261029-2"></script>
   <script src="/official-users.js"></script>
-  <script src="/prod.js?v=20261030-real1"></script>
+  <script src="/prod.js?v=20261030-onboard1"></script>
 </body>
 </html>
