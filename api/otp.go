@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net/http"
@@ -68,6 +69,8 @@ func generateOTPCode() string {
 }
 
 func sendOTPViaEmail(recipientEmail, code string) error {
+	loadEnvFile(".env")
+
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
 	if smtpPort == "" {
@@ -115,7 +118,7 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 	resendKey := os.Getenv("RESEND_API_KEY")
 	if resendKey != "" {
 		payload := map[string]interface{}{
-			"from":    "onboarding@resend.dev",
+			"from":    "BSrE BSSN <onboarding@resend.dev>",
 			"to":      []string{recipientEmail},
 			"subject": fmt.Sprintf("Kode OTP Verifikasi TTE BSrE BSSN: %s", code),
 			"html":    htmlBody,
@@ -126,14 +129,16 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 		req.Header.Set("Content-Type", "application/json")
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
-		if err == nil && resp.StatusCode < 300 {
-			log.Printf("[BSrE EMAIL SERVICE] ✓ Email OTP BERHASIL DIKIRIM via Resend API ke: %s", recipientEmail)
-			return nil
-		}
-		if err != nil {
-			log.Printf("[BSrE EMAIL SERVICE] Resend API error: %v", err)
+		if err == nil {
+			defer resp.Body.Close()
+			respBody, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode < 300 {
+				log.Printf("[BSrE EMAIL SERVICE] ✓ Email OTP BERHASIL DIKIRIM via Resend API ke: %s", recipientEmail)
+				return nil
+			}
+			log.Printf("[BSrE EMAIL SERVICE] ⚠️ Resend API returned status %d: %s", resp.StatusCode, string(respBody))
 		} else {
-			log.Printf("[BSrE EMAIL SERVICE] Resend API returned status %d", resp.StatusCode)
+			log.Printf("[BSrE EMAIL SERVICE] ⚠️ Resend API network error: %v", err)
 		}
 	}
 
