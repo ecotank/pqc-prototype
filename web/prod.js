@@ -121,8 +121,9 @@ createApp({
         this.currentUser = JSON.parse(savedUser);
       } catch (e) {}
     }
-    if (!this.currentUser && window.DEFAULT_DEMO_USERS && window.DEFAULT_DEMO_USERS.length > 0) {
-      this.currentUser = window.DEFAULT_DEMO_USERS[0];
+    const officialUsers = window.OFFICIAL_REGISTERED_USERS || window.DEFAULT_DEMO_USERS || [];
+    if (!this.currentUser && officialUsers.length > 0) {
+      this.currentUser = officialUsers[0];
       localStorage.setItem('pqc_user', JSON.stringify(this.currentUser));
     }
 
@@ -1270,8 +1271,8 @@ createApp({
         console.warn('Backend login tidak merespons, mencoba otentikasi lokal/standalone...');
       }
 
-      // Standalone Login Fallback (agar demo akun selalu bisa dibuka di Netlify)
-      const defaultList = (window.DEFAULT_DEMO_USERS && window.DEFAULT_DEMO_USERS.length > 0) ? window.DEFAULT_DEMO_USERS : [];
+      // Standalone Login Fallback (agar akun pejabat selalu dapat diautentikasi di Netlify)
+      const defaultList = (window.OFFICIAL_REGISTERED_USERS && window.OFFICIAL_REGISTERED_USERS.length > 0) ? window.OFFICIAL_REGISTERED_USERS : (window.DEFAULT_DEMO_USERS || []);
       let customUsers = [];
       try {
         customUsers = JSON.parse(localStorage.getItem('pqc_custom_users') || '[]');
@@ -1371,10 +1372,10 @@ createApp({
           return;
         }
       } catch (e) {
-        console.warn('Backend users API tidak merespons, beralih ke daftar demo mandiri...');
+        console.warn('Backend users API offline, menggunakan daftar akun resmi terdaftar...');
       }
 
-      const defaultList = (window.DEFAULT_DEMO_USERS && window.DEFAULT_DEMO_USERS.length > 0) ? window.DEFAULT_DEMO_USERS : [];
+      const defaultList = (window.OFFICIAL_REGISTERED_USERS && window.OFFICIAL_REGISTERED_USERS.length > 0) ? window.OFFICIAL_REGISTERED_USERS : (window.DEFAULT_DEMO_USERS || []);
       let customUsers = [];
       try {
         customUsers = JSON.parse(localStorage.getItem('pqc_custom_users') || '[]');
