@@ -637,8 +637,8 @@ createApp({
             // Coba backend lokal atau cloud tunnel
             const endpointsToTry = [
               '/api/v1/pades/sign',
-              'https://meter-combat-registration-calling.trycloudflare.com/api/v1/pades/sign',
-              'https://dont-app-architecture-word.trycloudflare.com/api/v1/pades/sign'
+              'https://cosmetic-display-live-trees.trycloudflare.com/api/v1/pades/sign',
+              'https://meter-combat-registration-calling.trycloudflare.com/api/v1/pades/sign'
             ];
 
             let padesData = null;
