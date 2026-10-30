@@ -50,7 +50,7 @@ startxref
   const mldsaPriv = '0'.repeat(8064);
   const mldsaPub = '0'.repeat(3904);
 
-  const res1 = await fetch('https://meter-combat-registration-calling.trycloudflare.com/api/v1/pades/sign', {
+  const res1 = await fetch('http://localhost:8080/api/v1/pades/sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -133,7 +133,7 @@ startxref
 
   // 5. Test Multi-Signature (Sign Again)
   console.log('[TEST 5] Multi-Signature Test (Signing already-signed PDF)...');
-  const res2 = await fetch('https://meter-combat-registration-calling.trycloudflare.com/api/v1/pades/sign', {
+  const res2 = await fetch('http://localhost:8080/api/v1/pades/sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
