@@ -80,7 +80,16 @@ createApp({
         error: '',
         loading: false
       },
-      availableUsers: []
+      availableUsers: [],
+
+      // Security Authorization Modal (Passphrase & Passkey)
+      showSecurityModal: false,
+      securityAuthTab: 'passphrase', // 'passphrase' | 'passkey'
+      passphraseInput: '',
+      showPassphraseText: false,
+      securityAuthError: '',
+      securityAuthLoading: false,
+      lastAuthMethod: 'Passphrase (PIN Kripto)'
     };
   },
 
@@ -581,6 +590,87 @@ createApp({
       if (!this.mldsaKey) {
         await this.initProductionKeys();
       }
+
+      // Tampilkan dialog otorisasi Passphrase / Passkey
+      this.securityAuthTab = 'passphrase';
+      this.passphraseInput = '';
+      this.securityAuthError = '';
+      this.securityAuthLoading = false;
+      this.showSecurityModal = true;
+    },
+
+    async confirmPassphraseAuth() {
+      if (!this.passphraseInput) {
+        this.securityAuthError = 'Harap masukkan passphrase / PIN sertifikat elektronik Anda.';
+        return;
+      }
+
+      // Validasi passphrase: kata sandi akun atau default Bssn@2026 / 123456
+      const userPwd = (this.currentUser && this.currentUser.password) ? this.currentUser.password : 'Bssn@2026';
+      if (this.passphraseInput !== userPwd && this.passphraseInput !== 'Bssn@2026' && this.passphraseInput !== '123456') {
+        this.securityAuthError = 'Passphrase salah. Gunakan kata sandi akun Anda atau Bssn@2026.';
+        return;
+      }
+
+      this.showSecurityModal = false;
+      await this.executeSigningProcess('Passphrase (PIN Kripto)');
+    },
+
+    async confirmPasskeyAuth() {
+      this.securityAuthLoading = true;
+      this.securityAuthError = '';
+
+      try {
+        if (!window.PublicKeyCredential) {
+          throw new Error('Perangkat peramban Anda belum mendukung standar WebAuthn / Passkey.');
+        }
+
+        const challenge = new Uint8Array(32);
+        crypto.getRandomValues(challenge);
+
+        // Panggil WebAuthn API asli sistem operasi (Windows Hello / Fingerprint / PIN)
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge: challenge,
+            rp: {
+              name: 'BSrE BSSN RI - TTE Pascakuantum',
+              id: window.location.hostname
+            },
+            user: {
+              id: new TextEncoder().encode(this.currentUser.username || 'user-bsre'),
+              name: this.currentUser.email || 'satria.alba@bsre.bssn.go.id',
+              displayName: this.currentUser.fullname || 'Satria Alba Pramasha'
+            },
+            pubKeyCredParams: [
+              { type: 'public-key', alg: -7 },  // ES256
+              { type: 'public-key', alg: -257 } // RS256
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: 'platform',
+              userVerification: 'preferred'
+            },
+            timeout: 60000
+          }
+        });
+
+        if (credential) {
+          this.securityAuthLoading = false;
+          this.showSecurityModal = false;
+          await this.executeSigningProcess('Passkey Biometrik (FIDO2 / Windows Hello)');
+        }
+      } catch (err) {
+        this.securityAuthLoading = false;
+        console.warn('Passkey auth cancelled/error:', err);
+        if (err.name === 'NotAllowedError') {
+          this.securityAuthError = 'Verifikasi Passkey dibatalkan pengguna atau waktu habis.';
+        } else {
+          this.securityAuthError = 'Gagal mengakses Passkey pada perangkat ini (' + err.message + '). Silakan gunakan tab Passphrase.';
+        }
+      }
+    },
+
+    async executeSigningProcess(authMethod) {
+      this.lastAuthMethod = authMethod || 'Passphrase (PIN Kripto)';
       this.isSigning = true;
 
       try {
@@ -764,6 +854,7 @@ createApp({
         this.signedResult = {
           receiptId: receiptUUID,
           algorithm: algName,
+          authMethod: this.lastAuthMethod,
           signedAt: now.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'medium' }),
           durationMs: durMs,
           signatureBytes: sigBytes,
@@ -785,6 +876,7 @@ createApp({
           signer: signerFullName,
           institution: this.currentUser ? this.currentUser.institution : 'BSrE BSSN RI',
           algorithm: algName,
+          auth_method: this.lastAuthMethod,
           time: timeStr,
           document_hash: this.documentHash,
           signature_hex: sigHex,
