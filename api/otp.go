@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,31 @@ type SendOTPReq struct {
 type VerifyOTPReq struct {
 	Email string `json:"email"`
 	Code  string `json:"code"`
+}
+
+func init() {
+	loadEnvFile(".env")
+}
+
+func loadEnvFile(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
+			v = strings.Trim(v, `"'`)
+			os.Setenv(k, v)
+		}
+	}
 }
 
 func generateOTPCode() string {
@@ -85,6 +111,33 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 </body>
 </html>`, code)
 
+	// Opsi 1: Pengiriman via Resend API (Jika RESEND_API_KEY disetel)
+	resendKey := os.Getenv("RESEND_API_KEY")
+	if resendKey != "" {
+		payload := map[string]interface{}{
+			"from":    "onboarding@resend.dev",
+			"to":      []string{recipientEmail},
+			"subject": fmt.Sprintf("Kode OTP Verifikasi TTE BSrE BSSN: %s", code),
+			"html":    htmlBody,
+		}
+		bodyBytes, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(bodyBytes))
+		req.Header.Set("Authorization", "Bearer "+resendKey)
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode < 300 {
+			log.Printf("[BSrE EMAIL SERVICE] ✓ Email OTP BERHASIL DIKIRIM via Resend API ke: %s", recipientEmail)
+			return nil
+		}
+		if err != nil {
+			log.Printf("[BSrE EMAIL SERVICE] Resend API error: %v", err)
+		} else {
+			log.Printf("[BSrE EMAIL SERVICE] Resend API returned status %d", resp.StatusCode)
+		}
+	}
+
+	// Opsi 2: Pengiriman via SMTP Relay (Gmail / Office365 / Corporate SMTP)
 	if smtpHost != "" && smtpUser != "" && smtpPass != "" {
 		auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 		headers := make(map[string]string)
@@ -207,3 +260,4 @@ func (h *APIHandler) HandleAuthTestInspectOTP(w http.ResponseWriter, r *http.Req
 		"code":  entry.Code,
 	}, "OTP entry retrieved for testing")
 }
+
