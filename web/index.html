@@ -1316,9 +1316,15 @@
               </div>
               <div class="flex justify-between items-center text-[10px]">
                 <span class="text-slate-400">Goresan otomatis dikonversi ke gambar PNG transparan</span>
-                <button type="button" @click="clearSignatureCanvas" class="text-rose-400 hover:text-rose-300 font-semibold">
-                  Hapus Goresan (Clear)
-                </button>
+                <div class="flex items-center space-x-2">
+                  <button type="button" @click="generateAutoSpecimen" class="text-blue-400 hover:text-blue-300 font-semibold">
+                    ⚡ Buat dari Nama
+                  </button>
+                  <span class="text-slate-600">|</span>
+                  <button type="button" @click="clearSignatureCanvas" class="text-rose-400 hover:text-rose-300 font-semibold">
+                    Hapus (Clear)
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1377,12 +1383,21 @@
 
               <img v-if="onboarding.faceMasterSnapshot" :src="onboarding.faceMasterSnapshot" class="w-full h-full object-cover transform -scale-x-100">
 
-              <div v-if="!onboarding.faceCameraActive && !onboarding.faceMasterSnapshot" class="text-center p-3 space-y-1.5">
+              <div v-if="!onboarding.faceCameraActive && !onboarding.faceMasterSnapshot" class="text-center p-3 space-y-2">
                 <div class="text-2xl text-slate-500">📷</div>
-                <p class="text-[11px] text-slate-300">Kamera siap merekam kontur wajah Anda.</p>
-                <button type="button" @click="startOnboardingCamera" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition">
-                  Nyalakan Kamera
-                </button>
+                <p class="text-[11px] text-slate-300">Pindai wajah langsung via kamera atau gunakan opsi alternatif.</p>
+                <div class="flex flex-wrap items-center justify-center gap-2">
+                  <button type="button" @click="startOnboardingCamera" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow">
+                    Nyalakan Kamera
+                  </button>
+                  <button type="button" @click="simulateFaceCapture" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-lg transition">
+                    ⚡ Simulasi Wajah Otomatis
+                  </button>
+                  <label class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-lg transition cursor-pointer">
+                    📁 Unggah Foto
+                    <input type="file" accept="image/*" @change="handleOnboardingFaceUpload" class="hidden">
+                  </label>
+                </div>
               </div>
 
               <!-- Reticle Oval Perekaman -->

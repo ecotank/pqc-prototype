@@ -1,3 +1,6 @@
+# Proxy API ke cloudflare tunnel backend pqc-server
+/api/*  https://cosmetic-display-live-trees.trycloudflare.com/api/:splat  200
+
 # Konfigurasi rewrite rute Netlify
 /              /index.html         200!
 /prod          /index.html         200!
