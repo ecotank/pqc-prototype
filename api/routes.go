@@ -46,6 +46,11 @@ func RegisterRoutes(mux *http.ServeMux, h *APIHandler) {
 	// 12. PAdES ISO 32000-1 Digital Signature & CA Endpoints
 	mux.HandleFunc("POST /api/v1/pades/sign", h.HandlePAdESSign)
 	mux.HandleFunc("GET /api/v1/ca/certificates", h.HandleCACertificates)
+
+	// 13. Layanan Verifikasi Email OTP
+	mux.HandleFunc("POST /api/v1/auth/otp/send", h.HandleAuthSendOTP)
+	mux.HandleFunc("POST /api/v1/auth/otp/verify", h.HandleAuthVerifyOTP)
+	mux.HandleFunc("GET /api/v1/auth/otp/test-inspect", h.HandleAuthTestInspectOTP)
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {

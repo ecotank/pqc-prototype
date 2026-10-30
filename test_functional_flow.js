@@ -22,11 +22,35 @@ async function main() {
 
   // 2. Simulasi 4 Tahap Onboarding Pengguna Baru
   console.log('\n[TAHAP 2] SIMULASI PENDAFTARAN & REGISTRASI PENGGUNA BARU...');
-  // Step 1: Email + OTP
+  // Step 1: Email + OTP Real Dispatch via API
   const email = 'raden.haryo@bssn.go.id';
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log(`  [Step 1] Input Email: ${email} -> OTP 6 Digit Dihasilkan: ${otpCode}`);
-  console.log('  [Step 1] Verifikasi OTP: COCOK');
+  
+  const sendResp = await fetch('http://localhost:8080/api/v1/auth/otp/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  const sendData = await sendResp.json();
+  if (!sendResp.ok || sendData.status !== 'SUCCESS') {
+    throw new Error('Gagal mengirim OTP via API: ' + JSON.stringify(sendData));
+  }
+  console.log(`  [Step 1] Request OTP ke Email: ${email} -> Server: ${sendData.message}`);
+
+  const inspectResp = await fetch(`http://localhost:8080/api/v1/auth/otp/test-inspect?email=${encodeURIComponent(email)}`);
+  const inspectData = await inspectResp.json();
+  const dispatchedOtp = inspectData.data.code;
+  console.log(`  [Step 1] OTP Masuk ke Mailbox (${email}): ${dispatchedOtp} (Tidak ditampilkan di halaman UI)`);
+
+  const verifyResp = await fetch('http://localhost:8080/api/v1/auth/otp/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code: dispatchedOtp })
+  });
+  const verifyData = await verifyResp.json();
+  if (!verifyResp.ok || verifyData.status !== 'SUCCESS') {
+    throw new Error('Verifikasi OTP via API gagal: ' + JSON.stringify(verifyData));
+  }
+  console.log('  [Step 1] Verifikasi OTP via API: LULUS (Email Terverifikasi Resmi)');
 
   // Step 2: Data Pribadi & Spesimen Tanda Tangan
   const dummyUser = {
