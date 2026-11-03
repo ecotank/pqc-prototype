@@ -490,6 +490,72 @@ func (h *APIHandler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request)
 	SendSuccess(w, nil, "Data profil berhasil diperbarui")
 }
 
+type SpecimenItem struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	DataURL   string `json:"data_url"`
+	IsDefault bool   `json:"is_default"`
+	CreatedAt string `json:"created_at"`
+}
+
+type SaveSpecimensReq struct {
+	Username  string         `json:"username"`
+	Specimens []SpecimenItem `json:"specimens"`
+}
+
+func (h *APIHandler) HandleGetSpecimens(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	if username == "" {
+		SendError(w, http.StatusBadRequest, "Username diperlukan")
+		return
+	}
+	user, err := h.store.GetUserByUsername(username)
+	if err != nil {
+		SendError(w, http.StatusNotFound, "Pengguna tidak ditemukan")
+		return
+	}
+	raw := strings.TrimSpace(user.SpecimenSignature)
+	var list []SpecimenItem
+	if raw == "" {
+		list = []SpecimenItem{}
+	} else if strings.HasPrefix(raw, "[") {
+		_ = json.Unmarshal([]byte(raw), &list)
+	} else {
+		list = []SpecimenItem{
+			{
+				ID:        "default",
+				Name:      "Spesimen Tanda Tangan",
+				DataURL:   raw,
+				IsDefault: true,
+				CreatedAt: time.Now().Format("02-01-2006 15:04"),
+			},
+		}
+	}
+	SendSuccess(w, list, "Daftar spesimen pengguna berhasil diambil")
+}
+
+func (h *APIHandler) HandleSaveSpecimens(w http.ResponseWriter, r *http.Request) {
+	var req SaveSpecimensReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" {
+		SendError(w, http.StatusBadRequest, "Username diperlukan")
+		return
+	}
+	jsonBytes, err := json.Marshal(req.Specimens)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal mengemas spesimen: "+err.Error())
+		return
+	}
+	if err := h.store.UpdateUserSpecimen(req.Username, string(jsonBytes)); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal menyimpan spesimen ke basis data: "+err.Error())
+		return
+	}
+	SendSuccess(w, req.Specimens, "Koleksi spesimen tanda tangan berhasil disimpan")
+}
+
 type UpdateSpecimenReq struct {
 	Username string `json:"username"`
 	Specimen string `json:"specimen"`

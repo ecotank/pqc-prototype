@@ -62,6 +62,8 @@ func RegisterRoutes(mux *http.ServeMux, h *APIHandler) {
 	mux.HandleFunc("POST /api/v1/user/password", h.HandleUpdatePassword)
 	mux.HandleFunc("POST /api/v1/user/profile", h.HandleUpdateProfile)
 	mux.HandleFunc("POST /api/v1/user/specimen", h.HandleUpdateSpecimen)
+	mux.HandleFunc("GET /api/v1/user/specimens", h.HandleGetSpecimens)
+	mux.HandleFunc("POST /api/v1/user/specimens", h.HandleSaveSpecimens)
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {

@@ -90,6 +90,11 @@ createApp({
       drawLastX: 0,
       drawLastY: 0,
 
+      // Multi-Specimen Collection
+      userSpecimens: [],
+      selectedSpecimenId: '',
+      specimenUploadName: '',
+
       // Interactive Drag & Resize Stamp
       isDraggingStamp: false,
       isResizingStamp: false,
@@ -274,6 +279,7 @@ createApp({
             this.currentUser = parsed;
             this.syncUserProfile();
             this.loadUserRegistry();
+            this.loadUserSpecimens();
             this.initProductionKeys();
             if (!this.currentUser.has_passphrase) {
               this.showPassphraseSetupModal = true;
@@ -332,6 +338,7 @@ createApp({
           this.syncUserProfile();
           this.showToast(`Selamat datang, ${this.currentUser.fullname}!`, 'success');
           this.loadUserRegistry();
+          this.loadUserSpecimens();
           this.initProductionKeys();
           if (!this.currentUser.has_passphrase) {
             this.showPassphraseSetupModal = true;
@@ -637,7 +644,11 @@ createApp({
         this.pdfDocProxy = (window.Vue && window.Vue.markRaw) ? window.Vue.markRaw(rawDoc) : rawDoc;
         this.pdfTotalPages = rawDoc.numPages;
         this.pdfCurrentPage = Math.min(Math.max(1, pageNumber), this.pdfTotalPages);
-        this.specimenPage = this.pdfCurrentPage;
+        if (!this.specimenPage || this.specimenPage < 1) {
+          this.specimenPage = 1;
+        } else if (this.specimenPage > this.pdfTotalPages) {
+          this.specimenPage = this.pdfTotalPages;
+        }
 
         const page = await rawDoc.getPage(this.pdfCurrentPage);
         const viewport = page.getViewport({ scale: 1.0 });
@@ -691,6 +702,12 @@ createApp({
         this.zoomLevel -= 0.15;
         this.renderPdfViewer(this.pdfCurrentPage);
       }
+    },
+
+    onSpecimenPageChange() {
+      if (this.specimenPage < 1) this.specimenPage = 1;
+      if (this.specimenPage > this.pdfTotalPages) this.specimenPage = this.pdfTotalPages;
+      this.renderPdfViewer(this.specimenPage);
     },
 
     handlePdfOverlayClick(e) {
@@ -809,21 +826,142 @@ createApp({
       if (!this.canvasWidth || !this.canvasHeight || !this.pdfActualPageWidth || !this.pdfActualPageHeight) {
         return { display: 'none' };
       }
+      if (Number(this.specimenPage) !== Number(this.pdfCurrentPage)) {
+        return { display: 'none' };
+      }
 
       const leftPercent = (this.specimenCustomX / this.pdfActualPageWidth) * 100;
       const widthPercent = (this.specimenWidth / this.pdfActualPageWidth) * 100;
       const heightPercent = (this.specimenHeight / this.pdfActualPageHeight) * 100;
       const topPercent = ((this.pdfActualPageHeight - this.specimenCustomY - this.specimenHeight) / this.pdfActualPageHeight) * 100;
 
-      const isCurrentTarget = Number(this.specimenPage) === this.pdfCurrentPage;
-
       return {
         left: Math.max(0, Math.min(100 - widthPercent, leftPercent)) + '%',
         top: Math.max(0, Math.min(100 - heightPercent, topPercent)) + '%',
         width: Math.max(5, Math.min(100, widthPercent)) + '%',
-        height: Math.max(4, Math.min(100, heightPercent)) + '%',
-        opacity: isCurrentTarget ? 1 : 0.35
+        height: Math.max(4, Math.min(100, heightPercent)) + '%'
       };
+    },
+
+    // ==========================================
+    // MULTI-SPESIMEN TANDA TANGAN (COLLECTION & STORAGE)
+    // ==========================================
+    async loadUserSpecimens() {
+      if (!this.currentUser) return;
+      const username = this.currentUser.username;
+      try {
+        const res = await fetch(`/api/v1/user/specimens?username=${encodeURIComponent(username)}`);
+        const json = await res.json();
+        if (res.ok && json.status === 'SUCCESS' && Array.isArray(json.data)) {
+          this.userSpecimens = json.data;
+          this.initActiveSpecimen();
+          return;
+        }
+      } catch (err) {
+        console.warn('Gagal memuat spesimen dari server, fallback cache:', err);
+      }
+
+      const cached = localStorage.getItem(`arsign_specimens_${username}`);
+      if (cached) {
+        try {
+          this.userSpecimens = JSON.parse(cached);
+          this.initActiveSpecimen();
+        } catch (e) {
+          this.userSpecimens = [];
+        }
+      }
+    },
+
+    initActiveSpecimen() {
+      if (!this.userSpecimens || this.userSpecimens.length === 0) {
+        this.selectedSpecimenId = '';
+        this.specimenImage = null;
+        return;
+      }
+      const def = this.userSpecimens.find(s => s.is_default) || this.userSpecimens[0];
+      if (def) {
+        this.selectedSpecimenId = def.id;
+        this.specimenImage = def.data_url;
+      }
+    },
+
+    async saveUserSpecimensToServer() {
+      if (!this.currentUser) return;
+      const username = this.currentUser.username;
+      localStorage.setItem(`arsign_specimens_${username}`, JSON.stringify(this.userSpecimens));
+
+      try {
+        await fetch('/api/v1/user/specimens', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: username,
+            specimens: this.userSpecimens
+          })
+        });
+      } catch (e) {
+        console.warn('Gagal sinkron spesimen ke server:', e);
+      }
+    },
+
+    async addSpecimen(name, dataUrl) {
+      if (!dataUrl) return;
+      const id = 'spec_' + Date.now();
+      const specName = name ? name.trim() : `Spesimen #${this.userSpecimens.length + 1}`;
+      const isFirst = this.userSpecimens.length === 0;
+
+      const newSpec = {
+        id: id,
+        name: specName,
+        data_url: dataUrl,
+        is_default: isFirst,
+        created_at: new Date().toLocaleDateString('id-ID')
+      };
+
+      this.userSpecimens.unshift(newSpec);
+      this.selectedSpecimenId = id;
+      this.specimenImage = dataUrl;
+      this.specimenSource = 'file';
+
+      await this.saveUserSpecimensToServer();
+      this.showToast(`Spesimen "${specName}" berhasil disimpan ke akun Anda.`, 'success');
+    },
+
+    onSelectSpecimen() {
+      if (!this.selectedSpecimenId) {
+        this.specimenImage = null;
+        return;
+      }
+      const found = this.userSpecimens.find(s => s.id === this.selectedSpecimenId);
+      if (found) {
+        this.specimenImage = found.data_url;
+        this.specimenSource = 'file';
+        this.showToast(`Spesimen aktif: ${found.name}`, 'info');
+      }
+    },
+
+    async deleteSpecimen(id) {
+      const idx = this.userSpecimens.findIndex(s => s.id === id);
+      if (idx === -1) return;
+      const removed = this.userSpecimens.splice(idx, 1)[0];
+      if (this.selectedSpecimenId === id) {
+        this.initActiveSpecimen();
+      }
+      await this.saveUserSpecimensToServer();
+      this.showToast(`Spesimen "${removed.name}" telah dihapus.`, 'info');
+    },
+
+    async setDefaultSpecimen(id) {
+      this.userSpecimens.forEach(s => {
+        s.is_default = (s.id === id);
+      });
+      const def = this.userSpecimens.find(s => s.id === id);
+      if (def) {
+        this.selectedSpecimenId = def.id;
+        this.specimenImage = def.data_url;
+      }
+      await this.saveUserSpecimensToServer();
+      this.showToast('Spesimen default berhasil diperbarui.', 'success');
     },
 
     // ==========================================
@@ -890,9 +1028,9 @@ createApp({
       const canvas = document.getElementById('specimenDrawCanvas');
       if (!canvas) return;
       const dataUrl = canvas.toDataURL('image/png');
-      this.specimenImage = dataUrl;
+      this.addSpecimen(this.specimenUploadName || `Coretan #${this.userSpecimens.length + 1}`, dataUrl);
+      this.specimenUploadName = '';
       this.closeSpecimenModal();
-      this.showToast('Spesimen tanda tangan berhasil diterapkan.', 'success');
     },
 
     // ==========================================
@@ -901,6 +1039,8 @@ createApp({
     async handleSpecimenFileUpload(e) {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+
+      const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
 
       if (file.type === 'application/pdf') {
         try {
@@ -914,9 +1054,9 @@ createApp({
             canvas.height = viewport.height;
             const ctx = canvas.getContext('2d');
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-            this.specimenImage = canvas.toDataURL('image/png');
-            this.specimenSource = 'file';
-            this.showToast('Halaman pertama spesimen PDF berhasil dimuat sebagai stempel.', 'success');
+            const dataUrl = canvas.toDataURL('image/png');
+            await this.addSpecimen(fileNameWithoutExt, dataUrl);
+            this.showToast('Halaman pertama spesimen PDF berhasil disimpan dan diterapkan.', 'success');
           } else {
             this.showToast('Pustaka PDF viewer belum siap.', 'warning');
           }
@@ -925,10 +1065,8 @@ createApp({
         }
       } else {
         const reader = new FileReader();
-        reader.onload = (ev) => {
-          this.specimenImage = ev.target.result;
-          this.specimenSource = 'file';
-          this.showToast('Gambar spesimen tanda tangan berhasil diunggah.', 'success');
+        reader.onload = async (ev) => {
+          await this.addSpecimen(fileNameWithoutExt, ev.target.result);
         };
         reader.readAsDataURL(file);
       }

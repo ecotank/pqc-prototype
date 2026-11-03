@@ -245,25 +245,30 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 
 	// Periksa apakah berkas PDF sudah memiliki slot placeholder kosong yang belum terisi (diawali '00000000...')
 	// Sebuah tanda tangan nyata selalu diawali '3082...' (ASN.1 DER Sequence), sedangkan placeholder kosong diawali '00000000'
-	unfilledPlaceholderTag := []byte("/Contents <00000000")
-	idxPlaceholder := bytes.LastIndex(pdfData, unfilledPlaceholderTag)
-
 	var workingPDF []byte
 	var startContents, endContents int
 	var offset1, offset2, offset3 int
 	const placeholderLen = 32768 // 32768 byte DER = 65536 karakter hexa
 
-	if idxPlaceholder != -1 {
+	placeholderRegex := regexp.MustCompile(`/Contents\s*<\s*0{16,}`)
+	loc := placeholderRegex.FindIndex(pdfData)
+
+	if loc != nil {
 		// Ditemukan slot placeholder alokasi tanda tangan baru yang belum terisi
 		workingPDF = make([]byte, len(pdfData))
 		copy(workingPDF, pdfData)
 
-		startContents = idxPlaceholder + len("/Contents <")
-		endContents = bytes.IndexByte(workingPDF[startContents:], '>')
-		if endContents == -1 {
+		bracketOpen := bytes.IndexByte(workingPDF[loc[0]:], '<')
+		if bracketOpen == -1 {
+			return nil, nil, fmt.Errorf("tanda pembuka '<' untuk /Contents tidak ditemukan")
+		}
+		startContents = loc[0] + bracketOpen + 1
+
+		endRel := bytes.IndexByte(workingPDF[startContents:], '>')
+		if endRel == -1 {
 			return nil, nil, fmt.Errorf("tanda penutup '>' untuk /Contents tidak ditemukan")
 		}
-		endContents += startContents
+		endContents = startContents + endRel
 
 		offset1 = startContents - 1
 		offset2 = endContents + 1
@@ -471,6 +476,38 @@ type PAdESVerifyDetail struct {
 	Message          string `json:"message"`
 }
 
+// parseASN1DERLength membaca tag SEQUENCE dan length ASN.1 DER untuk memotong hex secara presisi tanpa merusak trailing byte
+func parseASN1DERLength(derHex string) (int, error) {
+	if len(derHex) < 12 {
+		return 0, fmt.Errorf("data hex terlalu pendek")
+	}
+	headerBytes, err := hex.DecodeString(derHex[:12])
+	if err != nil {
+		return 0, err
+	}
+	if headerBytes[0] != 0x30 {
+		return 0, fmt.Errorf("bukan ASN.1 SEQUENCE (tag: %02x)", headerBytes[0])
+	}
+	lenByte := headerBytes[1]
+	if lenByte <= 0x7f {
+		return int(lenByte) + 2, nil
+	}
+	numLenBytes := int(lenByte & 0x7f)
+	if numLenBytes == 1 {
+		return int(headerBytes[2]) + 3, nil
+	} else if numLenBytes == 2 {
+		contentLen := int(headerBytes[2])<<8 | int(headerBytes[3])
+		return contentLen + 4, nil
+	} else if numLenBytes == 3 {
+		contentLen := int(headerBytes[2])<<16 | int(headerBytes[3])<<8 | int(headerBytes[4])
+		return contentLen + 5, nil
+	} else if numLenBytes == 4 {
+		contentLen := int(headerBytes[2])<<24 | int(headerBytes[3])<<16 | int(headerBytes[4])<<8 | int(headerBytes[5])
+		return contentLen + 6, nil
+	}
+	return 0, fmt.Errorf("panjang ASN.1 tidak didukung")
+}
+
 // VerifyPDFPAdES memverifikasi keaslian dan integritas tanda tangan PAdES ISO 32000-1 pada dokumen PDF
 func VerifyPDFPAdES(pdfData []byte) (*PAdESVerifyDetail, error) {
 	// 1. Cari /ByteRange terakhir
@@ -506,10 +543,16 @@ func VerifyPDFPAdES(pdfData []byte) (*PAdESVerifyDetail, error) {
 	// 3. Ekstraksi hex PKCS#7 di antara l0 dan o1
 	contentsSlice := pdfData[l0:o1]
 	rawHex := strings.Trim(string(contentsSlice), "<> \r\n\t")
-	// Hilangkan trailing zeros yang merupakan padding alokasi PDF
-	rawHex = strings.TrimRight(rawHex, "0")
-	if len(rawHex)%2 != 0 {
-		rawHex += "0"
+
+	// Ekstrak panjang eksak DER dari header ASN.1 ContentInfo
+	derLen, errLen := parseASN1DERLength(rawHex)
+	if errLen == nil && derLen > 0 && derLen*2 <= len(rawHex) {
+		rawHex = rawHex[:derLen*2]
+	} else {
+		rawHex = strings.TrimRight(rawHex, "0")
+		if len(rawHex)%2 != 0 {
+			rawHex += "0"
+		}
 	}
 
 	pkcs7Bytes, err := hex.DecodeString(rawHex)

@@ -45,11 +45,14 @@ window.PDFSigner = (function() {
     }
 
     const pages = pdfDoc.getPages();
-    let targetPage = pages[pages.length - 1];
-    if (opts.pageNumber === 'first' && pages.length > 0) {
+    let targetPage = pages[0] || null;
+    const targetPageNum = Number(opts.pageNumber);
+    if (!isNaN(targetPageNum) && targetPageNum >= 1 && targetPageNum <= pages.length) {
+      targetPage = pages[targetPageNum - 1];
+    } else if (opts.pageNumber === 'last' && pages.length > 0) {
+      targetPage = pages[pages.length - 1];
+    } else if (pages.length > 0) {
       targetPage = pages[0];
-    } else if (typeof opts.pageNumber === 'number' && opts.pageNumber >= 1 && opts.pageNumber <= pages.length) {
-      targetPage = pages[opts.pageNumber - 1];
     }
     const { width, height } = targetPage.getSize();
 
