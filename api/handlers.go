@@ -624,16 +624,6 @@ func (h *APIHandler) seedDefaultUsers() {
 			Email:       "sulthan@smallcircle.web.id",
 			Role:        "ASN",
 		},
-		{
-			ID:          "USR-PUB-01",
-			Username:    "warga.publik",
-			Password:    "warga2026",
-			FullName:    "Budi Santoso",
-			NikNip:      "3171022810990001",
-			Institution: "Masyarakat Umum (Pemohon Mandiri)",
-			Email:       "budi.santoso@warga.id",
-			Role:        "PUBLIC",
-		},
 	}
 
 	for _, d := range demoUsers {

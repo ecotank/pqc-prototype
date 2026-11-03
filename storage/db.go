@@ -143,30 +143,7 @@ func InitStorage(dbPath string) (*Storage, error) {
 }
 
 func (s *Storage) seedInitialData() {
-	var count int
-	_ = s.db.QueryRow("SELECT COUNT(*) FROM document_registry").Scan(&count)
-	if count == 0 {
-		_ = s.RecordRegistry(
-			"ARSIGN-2026-001",
-			"Spesifikasi Teknis Implementasi TTE Pascakuantum NIST FIPS 204 ML-DSA-65",
-			"Satria Alba (Tim ARSign 3 RPLK)",
-			"ML-DSA-65",
-			"2026-10-27 09:14 WIB",
-			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-			"",
-			"satria.alba",
-		)
-		_ = s.RecordRegistry(
-			"ARSIGN-2026-002",
-			"Laporan Pengujian Fungsional dan Kinerja TTE Pascakuantum ARSign",
-			"Radit & Sulthan (Tim ARSign 3 RPLK)",
-			"ML-DSA-65 + RSA",
-			"2026-10-26 14:32 WIB",
-			"d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
-			"",
-			"raditya",
-		)
-	}
+	// Real Production: Buku registrasi hanya memuat dokumen yang riil ditandatangani oleh pengguna
 }
 
 func (s *Storage) RecordAudit(op, alg string, dur float64, status, details string) error {

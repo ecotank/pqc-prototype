@@ -233,12 +233,6 @@ createApp({
       }
     },
 
-    quickLogin(username, password) {
-      this.loginForm.username = username;
-      this.loginForm.password = password;
-      this.login();
-    },
-
     async login() {
       if (!this.loginForm.username || !this.loginForm.password) {
         this.loginForm.error = 'Nama pengguna dan kata sandi wajib diisi.';

@@ -25,5 +25,8 @@ tmp/
 Thumbs.db
 
 
-# Environment Secrets
+# Environment Secrets & Private Keys
 .env
+*.key
+crypto/ca_keys/
+test_functional_*
