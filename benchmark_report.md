@@ -1,6 +1,6 @@
 # HASIL PENGUJIAN DAN BENCHMARK KOMPARATIF KRIPTOGRAFI
 **Implementasi Algoritma Tanda Tangan Pascakuantum NIST FIPS 204 ML-DSA-65**  
-**ARSign Trust Network — Tim 3 RPLK: Alba, Radit, Sulthan**  
+**ARSign Trust Network — Laboratorium Kriptografi Pascakuantum**  
 *Jumlah Sampel Pengujian: 50 Iterasi per Algoritma*
 
 ---

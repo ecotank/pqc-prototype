@@ -1,6 +1,6 @@
 /**
  * BENCHMARK KOMPARATIF KRIPTOGRAFI: ML-DSA-65 (NIST FIPS 204) VS RSA-2048 VS ECDSA P-256
- * Dibuat khusus untuk pengujian empiris Laporan Proyek ARSign (3 RPLK)
+ * Dibuat khusus untuk pengujian empiris ARSign Trust Network
  */
 
 import crypto from 'crypto';
@@ -204,7 +204,7 @@ async function runBenchmark() {
   // Generate Markdown report for Project Thesis
   const reportMarkdown = `# HASIL PENGUJIAN DAN BENCHMARK KOMPARATIF KRIPTOGRAFI
 **Implementasi Algoritma Tanda Tangan Pascakuantum NIST FIPS 204 ML-DSA-65**  
-**ARSign Trust Network — Tim 3 RPLK: Alba, Radit, Sulthan**  
+**ARSign Trust Network — Laboratorium Kriptografi Pascakuantum**  
 *Jumlah Sampel Pengujian: ${ITERATIONS} Iterasi per Algoritma*
 
 ---

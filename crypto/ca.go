@@ -80,7 +80,7 @@ func initARSignAuthority() (*ARSignAuthority, error) {
 	rootSubj := pkix.Name{
 		CommonName:         "ARSign Root CA (Pascakuantum Ready)",
 		Organization:       []string{"ARSign Trust Network"},
-		OrganizationalUnit: []string{"Rekayasa Perangkat Lunak Kripto (3 RPLK)"},
+		OrganizationalUnit: []string{"Otoritas Sertifikasi Digital"},
 		Country:            []string{"ID"},
 		Province:           []string{"DKI Jakarta"},
 		Locality:           []string{"Jakarta Selatan"},
@@ -119,7 +119,7 @@ func initARSignAuthority() (*ARSignAuthority, error) {
 	subSubj := pkix.Name{
 		CommonName:         "ARSign Sub-CA Pelayanan TTE Pascakuantum",
 		Organization:       []string{"ARSign Trust Network"},
-		OrganizationalUnit: []string{"Tim Pengembang Alba-Radit-Sulthan (3 RPLK)"},
+		OrganizationalUnit: []string{"Layanan TTE Pascakuantum"},
 		Country:            []string{"ID"},
 	}
 

@@ -1,18 +1,11 @@
 # ARSign — Platform Penandatanganan Digital Pascakuantum ML-DSA (NIST FIPS 204)
-**Proyek Rekayasa Perangkat Lunak Kripto — Tim 3 RPLK: Alba, Radit, Sulthan**
+**Platform Layanan & Purwarupa Tanda Tangan Elektronik Pascakuantum Berstandar FIPS 204**
 
-Purwarupa (Proof of Concept / Mini Project) penandatanganan digital pascakuantum berbasis **ML-DSA (Module-Lattice-Based Digital Signature Algorithm - NIST FIPS 204)** dengan perbandingan performa dan karakteristik terhadap **RSA-2048 / RSA-3072**, mengadopsi arsitektur standar TTE ISO 32000-1 / PAdES dan NIST FIPS 204.
+Purwarupa penandatanganan digital pascakuantum berbasis **ML-DSA (Module-Lattice-Based Digital Signature Algorithm - NIST FIPS 204)** dengan perbandingan performa dan karakteristik terhadap **RSA-2048 / RSA-3072**, mengadopsi arsitektur standar TTE ISO 32000-1 / PAdES dan NIST FIPS 204.
 
 Tersedia **2 Antarmuka Web Terpisah**:
-1. **Web Siap Produksi (Enterprise TTE Portal)**: Tampilan bersih, resmi, siap pakai untuk pengguna/instansi pemerintah (layanan TTE publik).
+1. **Web Siap Produksi (Enterprise TTE Portal)**: Tampilan bersih, resmi, siap pakai untuk penandatanganan dan verifikasi dokumen.
 2. **Web Visualisasi Proses (Laboratorium Riset Kriptografi)**: Tampilan teknis mendalam untuk meneliti proses matematis, matriks lattice, penolakan sampling (*rejection sampling*), dan inspeksi byte tanda tangan.
-
----
-
-## 👥 Tim Pengembang (Kelas 3 RPLK)
-- **Satria Alba Pramasha** - Kriptografi Pascakuantum (ML-DSA) & Kepatuhan FIPS 204
-- **Raditya** - Backend Service Golang, PKI Sub-CA & Infrastruktur API
-- **Sulthan Aidhan Afiq Sukarto** - Antarmuka Web Portal, Visualizer & Integrasi Klien
 
 ---
 

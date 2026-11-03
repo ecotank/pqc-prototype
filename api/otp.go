@@ -92,7 +92,7 @@ func sendOTPViaEmail(recipientEmail, code string) error {
   <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 14px; padding: 32px; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
     <div style="text-align: center; border-bottom: 1px solid #334155; padding-bottom: 20px; margin-bottom: 24px;">
       <h2 style="color: #38bdf8; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em;">ARSign</h2>
-      <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Layanan TTE Pascakuantum • Tim 3 RPLK (Alba, Radit, Sulthan)</p>
+      <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Layanan TTE Pascakuantum Resmi</p>
     </div>
     <h3 style="color: #ffffff; font-size: 17px; margin-top: 0;">Verifikasi Akun Penandatangan ARSign</h3>
     <p style="color: #cbd5e1; font-size: 13.5px; line-height: 1.6;">
@@ -109,8 +109,8 @@ func sendOTPViaEmail(recipientEmail, code string) error {
       🔒 <b>Peringatan Keamanan:</b> Jangan bagikan kode rahasia ini kepada siapa pun.
     </p>
     <div style="border-top: 1px solid #334155; margin-top: 24px; padding-top: 18px; text-align: center; color: #64748b; font-size: 11px;">
-      ARSign Platform — Rekayasa Perangkat Lunak Kripto (3 RPLK)<br>
-      Karya Kelompok: Alba • Radit • Sulthan • Standar NIST FIPS 204
+      ARSign Platform — Tanda Tangan Elektronik Pascakuantum<br>
+      Sertifikasi & Kriptografi Standar NIST FIPS 204
     </div>
   </div>
 </body>
@@ -121,7 +121,7 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 	if brevoKey != "" {
 		senderEmail := smtpUser
 		if senderEmail == "" {
-			senderEmail = "satrialbaa@gmail.com"
+			senderEmail = "no-reply@smallcircle.web.id"
 		}
 		payload := map[string]interface{}{
 			"sender": map[string]string{
@@ -189,7 +189,7 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 		}
 		fallbackEmail := os.Getenv("RESEND_FALLBACK_EMAIL")
 		if fallbackEmail == "" {
-			fallbackEmail = "satrialbaa@gmail.com"
+			fallbackEmail = "admin@smallcircle.web.id"
 		}
 
 		sendReq := func(toEmail, fromSender, subject, content string) (int, []byte, error) {

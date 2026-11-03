@@ -27,7 +27,7 @@ window.PDFSigner = (function() {
       const fontNorm = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
       page.drawText('ARSIGN POST-QUANTUM SIGNATURE', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
-      page.drawText('PLATFORM TTE REKAYASA PERANGKAT LUNAK KRIPTO (3 RPLK)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+      page.drawText('PLATFORM TTE PASCAKUANTUM RESMI (NIST FIPS 204)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
       page.drawLine({
         start: { x: 50, y: 760 },
         end: { x: 545, y: 760 },

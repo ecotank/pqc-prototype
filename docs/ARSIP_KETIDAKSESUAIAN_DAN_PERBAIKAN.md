@@ -1,6 +1,6 @@
 # ARSIP DOKUMENTASI KETIDAKSESUAIAN, HALUSINASI, DAN PERBAIKAN PROGRAM
 **Purwarupa Penandatanganan Digital Post-Quantum (ML-DSA NIST FIPS 204)**  
-**ARSign Platform — Tim 3 RPLK: Alba, Radit, Sulthan**  
+**ARSign Platform — Tim Pengembang Rekayasa Kriptografi**  
 *Tanggal Pencatatan: 2 November 2026*
 
 ---

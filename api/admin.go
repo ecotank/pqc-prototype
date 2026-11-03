@@ -87,7 +87,7 @@ func (h *APIHandler) HandleAdminExportLogs(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=arsign_system_activity_logs.json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"export_service": "ARSign PQC Administrator Audit Subsystem (3 RPLK)",
+		"export_service": "ARSign PQC Administrator Audit Subsystem",
 		"version":        "NIST FIPS 204 Ready",
 		"logs":           logs,
 	})

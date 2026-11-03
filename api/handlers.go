@@ -103,7 +103,7 @@ func (h *APIHandler) HandleSign(w http.ResponseWriter, r *http.Request) {
 
 	signer := req.SignerID
 	if signer == "" {
-		signer = "alba@smallcircle.web.id"
+		signer = "admin@smallcircle.web.id"
 	}
 
 	algUpper := strings.ToUpper(strings.TrimSpace(req.Algorithm))
@@ -265,7 +265,7 @@ func (h *APIHandler) HandleDualSign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.RecordAudit("DualSign", req.MLDSAAlgorithm+"+RSA", res.TotalDurationMs, "SUCCESS", fmt.Sprintf("Dual Sign ukuran %d B", res.TotalSizeBytes))
-	SendSignSuccess(w, res, res.MLDSAResult.SignatureHex, "Satria Alba Pramasha (Dual PQC+RSA)")
+	SendSignSuccess(w, res, res.MLDSAResult.SignatureHex, "Penandatangan Resmi ARSign (Dual PQC+RSA)")
 }
 
 type DualVerifyRequest struct {
@@ -579,11 +579,6 @@ func (h *APIHandler) HandleTraceVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) seedDefaultUsers() {
-	users, _ := h.store.GetUsersList()
-	if len(users) > 0 {
-		return
-	}
-
 	demoUsers := []struct {
 		ID          string
 		Username    string
@@ -595,38 +590,21 @@ func (h *APIHandler) seedDefaultUsers() {
 		Role        string
 	}{
 		{
-			ID:          "USR-ARS-01",
-			Username:    "satria.alba",
+			ID:          "USR-ADMIN-01",
+			Username:    "admin",
 			Password:    "arsign2026",
-			FullName:    "Satria Alba (Tim ARSign)",
-			NikNip:      "3271012610010001",
-			Institution: "Kelas 3 RPLK",
-			Email:       "alba@smallcircle.web.id",
-			Role:        "ASN",
-		},
-		{
-			ID:          "USR-ARS-02",
-			Username:    "raditya",
-			Password:    "arsign2026",
-			FullName:    "Raditya (Tim ARSign)",
-			NikNip:      "3271011205010002",
-			Institution: "Kelas 3 RPLK",
-			Email:       "radit@smallcircle.web.id",
-			Role:        "ASN",
-		},
-		{
-			ID:          "USR-ARS-03",
-			Username:    "sulthan.aidhan",
-			Password:    "arsign2026",
-			FullName:    "Sulthan Aidhan (Tim ARSign)",
-			NikNip:      "3271011504010003",
-			Institution: "Kelas 3 RPLK",
-			Email:       "sulthan@smallcircle.web.id",
+			FullName:    "Administrator ARSign",
+			NikNip:      "199001012024011001",
+			Institution: "Otoritas Sertifikasi ARSign",
+			Email:       "admin@smallcircle.web.id",
 			Role:        "ASN",
 		},
 	}
 
 	for _, d := range demoUsers {
+		if _, err := h.store.GetUserByUsername(d.Username); err == nil {
+			continue
+		}
 		keyRes, err := crypto.GenerateMLDSAKeyPair("ML-DSA-65")
 		if err != nil {
 			continue
@@ -876,7 +854,7 @@ func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request
 	}
 
 	SendSuccess(w, map[string]interface{}{
-		"ca_name":     "ARSign Trust Network (Tim 3 RPLK: Alba, Radit, Sulthan)",
+		"ca_name":     "ARSign Root & Sub-CA Trust Network",
 		"chain_pem":   ca.ExportPEMCertificates(),
 		"root_ca": CACertInfo{
 			Subject:      ca.RootCert.Subject.String(),

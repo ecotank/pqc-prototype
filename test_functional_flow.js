@@ -23,7 +23,7 @@ async function main() {
   // 2. Simulasi 4 Tahap Onboarding Pengguna Baru
   console.log('\n[TAHAP 2] SIMULASI PENDAFTARAN & REGISTRASI PENGGUNA BARU...');
   // Step 1: Email + OTP Real Dispatch via API
-  const email = 'radit@smallcircle.web.id';
+  const email = 'signer@smallcircle.web.id';
   
   const sendResp = await fetch('http://localhost:8080/api/v1/auth/otp/send', {
     method: 'POST',
@@ -58,7 +58,7 @@ async function main() {
     username: 'raden.haryo',
     fullname: 'Dr. Raden Haryo Wicaksono, M.Cs.',
     nik_nip: '3271012304850005',
-    institution: 'ARSign Trust Network (3 RPLK)',
+    institution: 'ARSign Trust Network',
     email: email,
     password: 'Password@2026',
     passphrase: 'RahasiaKripto2026!',

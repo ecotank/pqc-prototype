@@ -38,7 +38,7 @@ createApp({
 
       // 4. Fitur TTE (Signing State)
       inputMethod: 'file', // 'file' | 'text'
-      documentContent: 'DOKUMEN RESMI TTE PASCAKUANTUM ARSIGN\nNomor: ARS-DOC-2026-3RPLK\nPerihal: Penerapan Standar Digital Signature NIST FIPS 204 ML-DSA-65 oleh Tim 3 RPLK (Alba, Radit, Sulthan).',
+      documentContent: 'DOKUMEN RESMI TTE PASCAKUANTUM ARSIGN\nNomor: ARS-DOC-2026-FIPS204\nPerihal: Penerapan Standar Digital Signature Pascakuantum NIST FIPS 204 ML-DSA-65.',
       fileName: '',
       fileSize: 0,
       fileArrayBuffer: null,
@@ -426,7 +426,7 @@ createApp({
           const fontNorm = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
 
           page.drawText('ARSIGN — POST-QUANTUM SIGNATURE PLATFORM', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
-          page.drawText('REKAYASA PERANGKAT LUNAK KRIPTO (3 RPLK: Alba, Radit, Sulthan)', { x: 50, y: 772, size: 10, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+          page.drawText('OTORITAS TTE PASCAKUANTUM (NIST FIPS 204 ML-DSA)', { x: 50, y: 772, size: 10, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
           page.drawLine({ start: { x: 50, y: 760 }, end: { x: 545, y: 760 }, thickness: 1.5, color: PDFLib.rgb(0.1, 0.3, 0.6) });
 
           const lines = (this.documentContent || 'Dokumen Resmi Elektronik').split('\n');
@@ -857,7 +857,7 @@ createApp({
             time: found.time_str,
             hash: found.document_hash,
             receiptId: found.id,
-            caName: 'ARSign Trust Network (3 RPLK: Alba, Radit, Sulthan)',
+            caName: 'ARSign Trust Network (Pascakuantum Ready)',
             chainValid: true
           };
           this.showToast('Tanda Tangan Elektronik TERVERIFIKASI SAH!', 'success');
@@ -882,7 +882,7 @@ createApp({
               time: new Date().toLocaleString('id-ID'),
               hash: this.verifyDocumentHash,
               receiptId: 'ARS-VERIFIED',
-              caName: 'ARSign Trust Network (3 RPLK)',
+              caName: 'ARSign Trust Network',
               chainValid: true
             };
             this.showToast('Tanda Tangan Elektronik TERVERIFIKASI SAH!', 'success');

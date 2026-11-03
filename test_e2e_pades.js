@@ -55,10 +55,10 @@ startxref
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       pdf_base64: cleanBuf.toString('base64'),
-      signer_fullname: 'Satria Alba Pramasha, S.Tr.Kom.',
-      signer_email: 'alba@smallcircle.web.id',
+      signer_fullname: 'Penandatangan Dokumen Satu, S.Kom.',
+      signer_email: 'signer1@smallcircle.web.id',
       signer_nik: '199910262024011001',
-      institution: 'ARSign Trust Network (3 RPLK)',
+      institution: 'ARSign Trust Network',
       receipt_id: 'ARS-TEST-SIGN1',
       mldsa_private_key: mldsaPriv,
       mldsa_public_key: mldsaPub
@@ -114,7 +114,7 @@ startxref
 
   // Check embedded certificates in PKCS#7
   const certsText = execSync('openssl pkcs7 -in test_pkcs7_sig1.p7s -inform DER -print_certs -text', { encoding: 'utf-8' });
-  const hasSigner = certsText.includes('Satria Alba Pramasha');
+  const hasSigner = certsText.includes('Penandatangan Dokumen Satu');
   const hasSubCA = certsText.includes('ARSign Sub-CA Pelayanan TTE Pascakuantum');
   const hasRootCA = certsText.includes('ARSign Root CA');
   console.log(`  Contains Signer Cert : ${hasSigner}`);
@@ -138,10 +138,10 @@ startxref
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       pdf_base64: signedBuf1.toString('base64'),
-      signer_fullname: 'Raditya, S.Kom.',
-      signer_email: 'radit@smallcircle.web.id',
+      signer_fullname: 'Penandatangan Dokumen Dua, S.Kom.',
+      signer_email: 'signer2@smallcircle.web.id',
       signer_nik: '198501012010011002',
-      institution: 'ARSign Trust Network (3 RPLK)',
+      institution: 'ARSign Trust Network',
       receipt_id: 'ARS-TEST-SIGN2-MULTI',
       mldsa_private_key: mldsaPriv,
       mldsa_public_key: mldsaPub

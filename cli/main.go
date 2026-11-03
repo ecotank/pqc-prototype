@@ -41,8 +41,8 @@ func main() {
 
 func printUsage() {
 	fmt.Println("=====================================================================")
-	fmt.Println(" CLI PURWARUPA PENANDATANGANAN PASCALATTICE ML-DSA (ARSIGN - 3 RPLK)")
-	fmt.Println(" Standar: NIST FIPS 204 | Tim Pengembang: Alba, Radit, Sulthan")
+	fmt.Println(" CLI PENANDATANGANAN PASCALATTICE ML-DSA (ARSIGN)")
+	fmt.Println(" Standar: NIST FIPS 204 (Module-Lattice-Based Digital Signature)")
 	fmt.Println("=====================================================================")
 	fmt.Println("Penggunaan: pqc-cli <perintah> [opsi]")
 	fmt.Println()

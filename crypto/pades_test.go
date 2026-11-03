@@ -42,10 +42,10 @@ func TestPAdESSigningAndVerification(t *testing.T) {
 	signedPDF, result, err := SignPDFPAdES(
 		dummyPDF,
 		PAdESSignOptions{
-			SignerFullName:  "Satria Alba Pramasha, S.Tr.Kom.",
-			SignerEmail:     "alba@smallcircle.web.id",
+			SignerFullName:  "Pejabat Penandatangan Resmi, S.Kom.",
+			SignerEmail:     "signer@smallcircle.web.id",
 			SignerNIK:       "199910262024011001",
-			Institution:     "ARSign Trust Network (3 RPLK)",
+			Institution:     "ARSign Trust Network",
 			RSAKey:          rsaKey,
 			MLDSAPrivateKey: mldsaSK,
 			MLDSAPublicKey:  mldsaPK,

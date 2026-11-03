@@ -164,7 +164,7 @@ func main() {
 
 	fmt.Println("================================================================")
 	fmt.Println("   ARSIGN — POST-QUANTUM DIGITAL SIGNATURE ENGINE (ML-DSA)     ")
-	fmt.Println("   Tim Pengembang 3 RPLK: Alba, Radit, Sulthan                  ")
+	fmt.Println("   Layanan Penandatanganan Elektronik Pascakuantum Resmi       ")
 	fmt.Println("================================================================")
 	fmt.Printf("   Standar   : NIST FIPS 204 (ML-DSA-44, ML-DSA-65, ML-DSA-87)\n")
 	fmt.Printf("   Target TTE: =< 2.0 Detik (Aktual: Sub-Milidetik / < 1 ms)\n")

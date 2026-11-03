@@ -234,7 +234,7 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 	}
 	institution := opts.Institution
 	if institution == "" {
-		institution = "ARSign Trust Network (3 RPLK)"
+		institution = "ARSign Trust Network"
 	}
 
 	signerCert, signerCertDER, err := ca.IssueSignerCertificate(fullname, email, opts.SignerNIK, institution, &rsaKey.PublicKey)
