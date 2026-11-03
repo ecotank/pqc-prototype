@@ -119,6 +119,13 @@ createApp({
   },
 
   computed: {
+    userInitial() {
+      if (this.currentUser && this.currentUser.fullname) {
+        return this.currentUser.fullname.trim().charAt(0).toUpperCase();
+      }
+      return 'U';
+    },
+
     filteredRegistry() {
       if (!this.historySearch) return this.registryList;
       const q = this.historySearch.toLowerCase();
@@ -192,13 +199,19 @@ createApp({
       const stored = sessionStorage.getItem('arsign_user');
       if (stored) {
         try {
-          this.currentUser = JSON.parse(stored);
-          this.syncUserProfile();
-          this.loadUserRegistry();
-          this.initProductionKeys();
-          this.$nextTick(() => {
-            this.renderPdfViewer(1);
-          });
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.username && parsed.fullname) {
+            this.currentUser = parsed;
+            this.syncUserProfile();
+            this.loadUserRegistry();
+            this.initProductionKeys();
+            this.$nextTick(() => {
+              this.renderPdfViewer(1);
+            });
+          } else {
+            sessionStorage.removeItem('arsign_user');
+            this.currentUser = null;
+          }
         } catch (e) {
           sessionStorage.removeItem('arsign_user');
           this.currentUser = null;

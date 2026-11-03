@@ -62,7 +62,7 @@
   <script src="/vendor/qrcode.min.js"></script>
   <script src="/vendor/pdf.min.js"></script>
   <script src="/vendor/arsign-pades-template.js"></script>
-  <script src="/web/pdf-signer.js"></script>
+  <script src="/pdf-signer.js"></script>
 
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -295,7 +295,7 @@
           <!-- Current User Pill (Non-repudiation) -->
           <div class="flex items-center gap-2 pl-3 border-l border-slate-200 dark:border-slate-800">
             <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-              {{ currentUser.fullname.charAt(0) }}
+              {{ userInitial }}
             </div>
             <div class="hidden sm:block text-left">
               <div class="text-xs font-bold text-slate-900 dark:text-white leading-none">{{ currentUser.fullname }}</div>
@@ -961,6 +961,6 @@
   </div>
 
   <!-- Main Vue Application Logic -->
-  <script src="/web/prod.js"></script>
+  <script src="/prod.js"></script>
 </body>
 </html>
