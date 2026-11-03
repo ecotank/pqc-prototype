@@ -5,6 +5,7 @@ createApp({
     return {
       // 1. Theme & Navigation
       theme: localStorage.getItem('arsign_theme') || 'dark',
+      currentScreen: 'landing', // 'landing' | 'auth' | 'app'
       activeTab: 'tte', // 'tte' | 'verify' | 'history' | 'settings'
 
       // 2. Authentication & Current User
@@ -27,6 +28,32 @@ createApp({
         error: '',
         loading: false
       },
+      registerOtp: {
+        sent: false,
+        input: '',
+        timer: 60,
+        interval: null,
+        loading: false,
+        verified: false
+      },
+
+      // Onboarding Passphrase Setup
+      showPassphraseSetupModal: false,
+      passphraseForm: {
+        passphrase: '',
+        confirm_passphrase: '',
+        error: '',
+        loading: false
+      },
+
+      // Center Signing Passphrase Modal
+      showSigningPassphraseModal: false,
+      signingPassphraseInput: '',
+      signingPassphraseError: '',
+      signingPassphraseLoading: false,
+
+      // Center Success Modal & Verification Offer
+      showSuccessModal: false,
 
       // 3. Toast Notifications
       toast: {
@@ -37,6 +64,8 @@ createApp({
       },
 
       // 4. Fitur TTE (Signing State)
+      tteMode: 'visible', // 'visible' | 'invisible'
+      specimenSource: 'qrcode', // 'file' | 'qrcode'
       inputMethod: 'file', // 'file' | 'text'
       documentContent: 'DOKUMEN RESMI TANDA TANGAN ELEKTRONIK ARSIGN\nNomor: ARS-DOC-2026-TTE\nPerihal: Penerapan Standar Digital Signature Sah dan Tersertifikasi.',
       fileName: '',
@@ -193,6 +222,36 @@ createApp({
     },
 
     // ==========================================
+    // SCREEN NAVIGATION & FLOW
+    // ==========================================
+    goToLanding() {
+      this.currentScreen = 'landing';
+    },
+
+    goToAuth(tab = 'login') {
+      if (this.currentUser) {
+        if (!this.currentUser.has_passphrase) {
+          this.showPassphraseSetupModal = true;
+        }
+        this.currentScreen = 'app';
+        return;
+      }
+      this.authTab = tab;
+      this.currentScreen = 'auth';
+    },
+
+    goToApp() {
+      if (!this.currentUser) {
+        this.goToAuth('login');
+        return;
+      }
+      if (!this.currentUser.has_passphrase) {
+        this.showPassphraseSetupModal = true;
+      }
+      this.currentScreen = 'app';
+    },
+
+    // ==========================================
     // AUTHENTICATION & SESSION
     // ==========================================
     initSession() {
@@ -205,6 +264,9 @@ createApp({
             this.syncUserProfile();
             this.loadUserRegistry();
             this.initProductionKeys();
+            if (!this.currentUser.has_passphrase) {
+              this.showPassphraseSetupModal = true;
+            }
             this.$nextTick(() => {
               this.renderPdfViewer(1);
             });
@@ -260,6 +322,10 @@ createApp({
           this.showToast(`Selamat datang, ${this.currentUser.fullname}!`, 'success');
           this.loadUserRegistry();
           this.initProductionKeys();
+          if (!this.currentUser.has_passphrase) {
+            this.showPassphraseSetupModal = true;
+          }
+          this.currentScreen = 'app';
           this.$nextTick(() => {
             this.renderPdfViewer(1);
           });
@@ -273,10 +339,83 @@ createApp({
       }
     },
 
+    async sendRegisterOtp() {
+      if (!this.registerForm.email || !this.registerForm.email.includes('@')) {
+        this.registerForm.error = 'Masukkan alamat email yang valid untuk pengiriman OTP.';
+        return;
+      }
+      this.registerOtp.loading = true;
+      this.registerForm.error = '';
+
+      try {
+        const res = await fetch('/api/v1/auth/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.registerForm.email.trim() })
+        });
+        const json = await res.json();
+        if (res.ok && json.status === 'SUCCESS') {
+          this.registerOtp.sent = true;
+          this.registerOtp.timer = 60;
+          this.showToast(`Kode OTP dikirim ke ${this.registerForm.email}`, 'info');
+          if (this.registerOtp.interval) clearInterval(this.registerOtp.interval);
+          this.registerOtp.interval = setInterval(() => {
+            if (this.registerOtp.timer > 0) {
+              this.registerOtp.timer--;
+            } else {
+              clearInterval(this.registerOtp.interval);
+            }
+          }, 1000);
+        } else {
+          this.registerForm.error = json.message || 'Gagal mengirim OTP pendaftaran.';
+        }
+      } catch (err) {
+        this.registerForm.error = 'Gagal menghubungi layanan OTP: ' + err.message;
+      } finally {
+        this.registerOtp.loading = false;
+      }
+    },
+
+    async verifyRegisterOtp() {
+      if (!this.registerOtp.input || this.registerOtp.input.length < 6) {
+        this.registerForm.error = 'Masukkan 6 digit kode OTP verifikasi email.';
+        return;
+      }
+      this.registerOtp.loading = true;
+      this.registerForm.error = '';
+
+      try {
+        const res = await fetch('/api/v1/auth/otp/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: this.registerForm.email.trim(),
+            code: this.registerOtp.input.trim()
+          })
+        });
+        const json = await res.json();
+        if (res.ok && json.status === 'SUCCESS') {
+          this.registerOtp.verified = true;
+          this.showToast('Email terverifikasi secara sah! Silakan selesaikan pendaftaran.', 'success');
+        } else {
+          this.registerForm.error = json.message || 'Kode OTP tidak cocok.';
+        }
+      } catch (err) {
+        this.registerForm.error = 'Gagal memverifikasi OTP: ' + err.message;
+      } finally {
+        this.registerOtp.loading = false;
+      }
+    },
+
     async register() {
       const f = this.registerForm;
       if (!f.fullname || !f.username || !f.password || !f.nik_nip || !f.email) {
         f.error = 'Seluruh bidang wajib diisi lengkap.';
+        return;
+      }
+
+      if (!this.registerOtp.verified) {
+        f.error = 'Verifikasi kode OTP email Anda terlebih dahulu sebelum mendaftar.';
         return;
       }
 
@@ -300,11 +439,11 @@ createApp({
 
         const json = await res.json();
         if (res.ok && json.status === 'SUCCESS') {
-          this.showToast('Akun berhasil dibuat beserta sertifikat tanda tangan digital! Silakan login.', 'success');
+          this.showToast('Akun berhasil dibuat! Silakan masuk dan setel passphrase TTE Anda.', 'success');
           this.authTab = 'login';
           this.loginForm.username = f.username.trim();
           this.loginForm.password = f.password;
-          this.login();
+          await this.login();
         } else {
           f.error = json.message || 'Pendaftaran gagal.';
         }
@@ -315,11 +454,52 @@ createApp({
       }
     },
 
+    async savePassphrase() {
+      const p = this.passphraseForm;
+      if (!p.passphrase || p.passphrase.length < 6) {
+        p.error = 'Passphrase minimal 6 karakter demi keamanan penandatanganan.';
+        return;
+      }
+      if (p.passphrase !== p.confirm_passphrase) {
+        p.error = 'Konfirmasi passphrase tidak cocok dengan input pertama.';
+        return;
+      }
+
+      p.loading = true;
+      p.error = '';
+
+      try {
+        const res = await fetch('/api/v1/auth/passphrase/set', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: this.currentUser.username,
+            passphrase: p.passphrase
+          })
+        });
+        const json = await res.json();
+        if (res.ok && json.status === 'SUCCESS') {
+          this.currentUser.has_passphrase = true;
+          sessionStorage.setItem('arsign_user', JSON.stringify(this.currentUser));
+          this.showPassphraseSetupModal = false;
+          this.showToast('Passphrase penandatanganan TTE berhasil diaktifkan!', 'success');
+          this.currentScreen = 'app';
+        } else {
+          p.error = json.message || 'Gagal menyimpan passphrase.';
+        }
+      } catch (err) {
+        p.error = 'Gagal menyimpan passphrase: ' + err.message;
+      } finally {
+        p.loading = false;
+      }
+    },
+
     logout() {
       sessionStorage.removeItem('arsign_user');
       this.currentUser = null;
       this.registryList = [];
       this.signedResult = null;
+      this.currentScreen = 'landing';
       this.showToast('Anda telah keluar dari sesi ARSign.', 'info');
     },
 
@@ -616,101 +796,78 @@ createApp({
     },
 
     // ==========================================
-    // 2FA EMAIL OTP VERIFICATION
+    // SPESIMEN & FILE HANDLING
     // ==========================================
-    async sendOtp() {
-      if (!this.currentUser || !this.currentUser.email) {
-        this.showToast('Email penanda tangan tidak terdeteksi.', 'error');
-        return;
-      }
+    async handleSpecimenFileUpload(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
 
-      this.otpLoading = true;
-      this.otpVerified = false;
-
-      try {
-        const res = await fetch('/api/v1/auth/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this.currentUser.email })
-        });
-        const json = await res.json();
-        if (res.ok && json.status === 'SUCCESS') {
-          this.otpSent = true;
-          this.otpInput = '';
-          this.showToast(`Kode OTP dikirim ke ${this.currentUser.email}`, 'success');
-          this.startOtpTimer();
-        } else {
-          this.showToast(json.message || 'Gagal mengirim OTP.', 'error');
+      if (file.type === 'application/pdf') {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          if (window.pdfjsLib) {
+            const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext('2d');
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            this.specimenImage = canvas.toDataURL('image/png');
+            this.specimenSource = 'file';
+            this.showToast('Halaman pertama spesimen PDF berhasil dimuat sebagai stempel.', 'success');
+          } else {
+            this.showToast('Pustaka PDF viewer belum siap.', 'warning');
+          }
+        } catch (err) {
+          this.showToast('Gagal memuat spesimen PDF: ' + err.message, 'error');
         }
-      } catch (err) {
-        this.showToast('Gagal menghubungi layanan OTP: ' + err.message, 'error');
-      } finally {
-        this.otpLoading = false;
-      }
-    },
-
-    startOtpTimer() {
-      this.otpTimer = 60;
-      if (this.otpTimerInterval) clearInterval(this.otpTimerInterval);
-      this.otpTimerInterval = setInterval(() => {
-        if (this.otpTimer > 0) {
-          this.otpTimer--;
-        } else {
-          clearInterval(this.otpTimerInterval);
-        }
-      }, 1000);
-    },
-
-    async verifyOtp() {
-      if (!this.otpInput || this.otpInput.length < 6) {
-        this.showToast('Masukkan 6-digit kode OTP.', 'warning');
-        return;
-      }
-
-      this.otpLoading = true;
-      try {
-        const res = await fetch('/api/v1/auth/otp/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: this.currentUser.email,
-            code: this.otpInput.trim()
-          })
-        });
-        const json = await res.json();
-        if (res.ok && json.status === 'SUCCESS') {
-          this.otpVerified = true;
-          this.showToast('Otorisasi OTP Berhasil! Anda siap menandatangani.', 'success');
-        } else {
-          this.showToast(json.message || 'Kode OTP tidak sesuai.', 'error');
-        }
-      } catch (err) {
-        this.showToast('Gagal verifikasi OTP: ' + err.message, 'error');
-      } finally {
-        this.otpLoading = false;
+      } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          this.specimenImage = ev.target.result;
+          this.specimenSource = 'file';
+          this.showToast('Gambar spesimen tanda tangan berhasil diunggah.', 'success');
+        };
+        reader.readAsDataURL(file);
       }
     },
 
     // ==========================================
-    // FITUR TTE: SIGNING PROCESS (ML-DSA-65)
+    // FITUR TTE: SIGNING PROCESS (PASSPHRASE AUTH)
     // ==========================================
-    async signDocument() {
+    openSigningPassphraseModal() {
       if (!this.currentUser) {
-        this.showToast('Wajib login untuk menandatangani dokumen.', 'error');
+        this.showToast('Wajib masuk untuk menandatangani berkas.', 'error');
+        this.goToAuth('login');
         return;
       }
 
-      // Pastikan OTP terverifikasi jika sudah dikirim, atau minta OTP
-      if (!this.otpVerified) {
-        if (!this.otpSent) {
-          this.showToast('Silakan klik "Kirim OTP" untuk otorisasi keamanan sebelum TTE.', 'warning');
-        } else {
-          this.showToast('Silakan masukkan dan verifikasi kode OTP Anda.', 'warning');
-        }
+      if (!this.currentUser.has_passphrase) {
+        this.showToast('Silakan atur passphrase penandatanganan Anda terlebih dahulu.', 'warning');
+        this.showPassphraseSetupModal = true;
         return;
       }
 
-      this.isSigning = true;
+      if (this.inputMethod === 'file' && !this.fileArrayBuffer) {
+        this.showToast('Silakan pilih berkas PDF yang akan ditandatangani.', 'warning');
+        return;
+      }
+
+      this.signingPassphraseInput = '';
+      this.signingPassphraseError = '';
+      this.showSigningPassphraseModal = true;
+    },
+
+    async confirmAndSignDocument() {
+      if (!this.signingPassphraseInput) {
+        this.signingPassphraseError = 'Masukkan passphrase penandatanganan Anda.';
+        return;
+      }
+
+      this.signingPassphraseLoading = true;
+      this.signingPassphraseError = '';
 
       try {
         let pdfBytesFinal = null;
@@ -734,12 +891,14 @@ createApp({
           }
         }
 
-        // 1. Sematkan visualisasi spesimen & stempel PAdES
+        // 1. Sematkan visualisasi spesimen / stempel QR Code / mode invisible
         if (window.PDFSigner) {
           const visualRes = await window.PDFSigner.embedSpecimenAndStamp({
             pdfArrayBuffer: this.inputMethod === 'file' ? this.fileArrayBuffer : null,
             textContent: this.inputMethod === 'text' ? this.documentContent : null,
-            specimenDataUrl: this.specimenImage,
+            invisible: this.tteMode === 'invisible',
+            stampType: this.specimenSource === 'file' ? 'specimen' : 'qrcode_name',
+            specimenDataUrl: (this.tteMode === 'visible' && this.specimenSource === 'file') ? this.specimenImage : null,
             position: this.specimenPosition,
             customX: Number(this.specimenCustomX),
             customY: Number(this.specimenCustomY),
@@ -753,7 +912,7 @@ createApp({
           this.documentHash = visualRes.sha256Hex;
         }
 
-        // 2. Hubungi Backend PAdES Endpoint
+        // 2. Hubungi Backend PAdES Endpoint dengan Passphrase
         let binaryStr = '';
         const chunkSize = 8192;
         for (let i = 0; i < pdfBytesFinal.length; i += chunkSize) {
@@ -772,6 +931,7 @@ createApp({
             institution: this.currentUser ? (this.currentUser.institution || '') : '',
             receipt_id: receiptUUID,
             username: this.currentUser ? this.currentUser.username : '',
+            passphrase: this.signingPassphraseInput,
             mldsa_private_key: signerPrivKey,
             mldsa_public_key: signerPubKey,
             signer_mldsa_privkey: signerPrivKey,
@@ -814,11 +974,12 @@ createApp({
           duration_ms: data.signing_duration_ms || data.duration_ms || 0.6,
           signature_hex: data.signature_hex || data.mldsa_signature_hex || data.pkcs7_signature_hex,
           pdf_blob_url: blobUrl,
+          signed_blob: blob,
           file_name: 'ARSIGN_SIGNED_' + (this.fileName || 'dokumen.pdf'),
           signed_at: new Date().toLocaleString('id-ID')
         };
 
-        // 3. Catat di Registry (dengan kepemilikan username pengguna aktif)
+        // Catat di Registry SQLite
         const registryItem = {
           id: receiptUUID,
           title: this.fileName || 'Nota Dinas Resmi Elektronik',
@@ -842,12 +1003,42 @@ createApp({
 
         this.saveLocalRegistryItem(registryItem);
         this.loadUserRegistry();
-        this.showToast('Dokumen berhasil ditandatangani secara sah!', 'success');
+
+        // Tutup modal passphrase, buka modal sukses
+        this.showSigningPassphraseModal = false;
+        this.showSuccessModal = true;
+        this.showToast('Dokumen berhasil ditandatangani secara elektronik!', 'success');
       } catch (err) {
-        this.showToast('Gagal menandatangani: ' + err.message, 'error');
+        this.signingPassphraseError = err.message || 'Gagal menandatangani berkas';
       } finally {
-        this.isSigning = false;
+        this.signingPassphraseLoading = false;
       }
+    },
+
+    downloadSignedPdf() {
+      if (!this.signedResult || !this.signedResult.pdf_blob_url) return;
+      const a = document.createElement('a');
+      a.href = this.signedResult.pdf_blob_url;
+      a.download = this.signedResult.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    },
+
+    openVerificationFromSuccess() {
+      if (!this.signedResult) return;
+      const targetBlob = this.signedResult.signed_blob;
+      const targetName = this.signedResult.file_name;
+      this.showSuccessModal = false;
+
+      this.activeTab = 'verify';
+      this.verifyInputMode = 'file';
+      this.verifyFileName = targetName;
+      this.verifyFile = new File([targetBlob], targetName, { type: 'application/pdf' });
+
+      this.$nextTick(() => {
+        this.verifyDocument();
+      });
     },
 
     // ==========================================

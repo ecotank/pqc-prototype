@@ -97,12 +97,337 @@
     </transition>
 
     <!-- ================================================================= -->
-    <!-- SCREEN A: AUTHENTICATION GATEWAY (JIKA BELUM LOGIN)               -->
+    <!-- SCREEN 1: LANDING PAGE EDUKATIF & INFORMATIF (DEFAULT)             -->
     <!-- ================================================================= -->
-    <div v-if="!currentUser" class="min-h-screen w-full flex flex-col justify-center items-center p-4 bg-slate-100 dark:bg-slate-950 transition-colors">
-      <!-- Dark/Light Toggle for Login Screen -->
-      <div class="absolute top-5 right-5">
-        <button @click="toggleTheme" class="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-blue-500 shadow-sm transition">
+    <div v-if="currentScreen === 'landing'" class="h-full w-full flex flex-col overflow-y-auto bg-slate-50 dark:bg-slate-950 transition-colors select-text">
+      
+      <!-- Top Navbar Landing Page -->
+      <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-[#0E3379] p-2 flex items-center justify-center shadow-md border border-blue-200 dark:border-blue-900">
+            <img src="/assets/logo-navy.svg" class="w-full h-full object-contain block dark:hidden" alt="ARSign Logo">
+            <img src="/assets/logo-white.svg" class="w-full h-full object-contain hidden dark:block" alt="ARSign Logo">
+          </div>
+          <div>
+            <span class="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">ARSign</span>
+            <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">Tersertifikasi Sah</span>
+          </div>
+        </div>
+
+        <nav class="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600 dark:text-slate-300">
+          <a href="#edukasi" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Tentang TTE</a>
+          <a href="#fitur" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Fitur Unggulan</a>
+          <a href="#alur" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Alur Penggunaan</a>
+        </nav>
+
+        <div class="flex items-center gap-3">
+          <!-- Theme Toggle -->
+          <button @click="toggleTheme" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-500 shadow-sm transition">
+            <span v-if="theme === 'dark'">☀️</span>
+            <span v-else>🌙</span>
+          </button>
+
+          <!-- Nav Action CTA -->
+          <button v-if="currentUser" @click="goToApp"
+                  class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition flex items-center gap-1.5">
+            <span>🚀 Buka Dashboard TTE</span>
+          </button>
+          <button v-else @click="goToAuth('login')"
+                  class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition flex items-center gap-1.5">
+            <span>Masuk / Daftar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Hero Section -->
+      <section class="relative pt-12 pb-16 sm:pt-20 sm:pb-24 px-4 sm:px-8 max-w-6xl mx-auto text-center">
+        <!-- Floating Badge -->
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold mb-6 shadow-sm">
+          <span class="animate-pulse">🛡️</span>
+          <span>Platform Tanda Tangan Elektronik Sah & Tersertifikasi</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight sm:leading-tight mb-6 max-w-4xl mx-auto">
+          Tanda Tangan Elektronik Sah, Tersertifikasi, dan <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Berkekuatan Hukum Penuh</span>
+        </h1>
+
+        <p class="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed mb-8">
+          Solusi terpadu pengesahan dokumen digital dengan standar kriptografi ISO 32000-1 PAdES. Menjamin otentisitas penanda tangan, integritas berkas anti-pemalsuan, serta perlindungan privasi berbasis passphrase mandiri.
+        </p>
+
+        <!-- Primary CTA Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
+          <button @click="goToAuth('login')"
+                  class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-xl shadow-blue-500/25 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2.5">
+            <span>✍️</span>
+            <span>Tandatangani Berkas di Sini</span>
+            <span class="text-base">→</span>
+          </button>
+
+          <button @click="goToApp(); activeTab = 'verify'"
+                  class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 hover:border-blue-500 text-slate-700 dark:text-slate-200 font-bold text-sm shadow-sm transition flex items-center justify-center gap-2">
+            <span>🔍</span>
+            <span>Verifikasi Dokumen</span>
+          </button>
+        </div>
+
+        <!-- Trust Features Bar -->
+        <div class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
+          <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div class="text-lg mb-1">⚖️</div>
+            <div class="font-bold text-xs text-slate-900 dark:text-white">Sah di Mata Hukum</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Memenuhi standar alat bukti elektronik UU ITE & PP 71/2019.</div>
+          </div>
+          <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div class="text-lg mb-1">🛡️</div>
+            <div class="font-bold text-xs text-slate-900 dark:text-white">Anti-Manipulasi</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Perubahan sekecil apapun akan merusak validitas hash dokumen.</div>
+          </div>
+          <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div class="text-lg mb-1">🔐</div>
+            <div class="font-bold text-xs text-slate-900 dark:text-white">Otorisasi Passphrase</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Tanda tangan personal dilindungi kode rahasia pemilik akun.</div>
+          </div>
+          <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div class="text-lg mb-1">📄</div>
+            <div class="font-bold text-xs text-slate-900 dark:text-white">Standar ISO 32000-1</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Kompatibel penuh pembaca PDF resmi global dan lokal.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Edukasi TTE -->
+      <section id="edukasi" class="py-12 bg-white dark:bg-slate-900/60 border-y border-slate-200 dark:border-slate-800 px-4 sm:px-8">
+        <div class="max-w-6xl mx-auto">
+          <div class="text-center max-w-2xl mx-auto mb-10">
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Mengenal Tanda Tangan Elektronik (TTE)</h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">
+              TTE bukan sekadar scan tanda tangan basah, melainkan sertifikat kriptografis yang mengikat identitas penanda tangan ke isi dokumen secara matematis.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="p-6 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl mb-4 border border-blue-200 dark:border-blue-900">
+                  📜
+                </div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-2">Non-Repudiation (Anti-Sangkalan)</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Setiap penandatanganan menggunakan kunci privat kriptografi unik milik pengguna. Setelah dibubuhi, penanda tangan tidak dapat menyangkal bahwa dokumen tersebut telah ia setujui dan tandatangani secara sadar.
+                </p>
+              </div>
+            </div>
+
+            <div class="p-6 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl mb-4 border border-emerald-200 dark:border-emerald-900">
+                  🔒
+                </div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-2">Integritas Dokumen (Data Integrity)</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Dokumen dilindungi dengan ringkasan pesan hash SHA-256/SHA-512. Apabila terjadi perubahan pada isi dokumen, bahkan satu huruf atau tanda baca sekalipun, verifikasi akan otomatis menyatakan dokumen telah dimodifikasi.
+                </p>
+              </div>
+            </div>
+
+            <div class="p-6 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl mb-4 border border-indigo-200 dark:border-indigo-900">
+                  🏛️
+                </div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-2">Kepastian Hukum & Regulasi</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Sesuai dengan ketentuan perundang-undangan Republik Indonesia, Tanda Tangan Elektronik yang tersertifikasi memiliki kekuatan hukum dan akibat hukum yang sah, setara dengan tanda tangan basah pada dokumen fisik.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Fitur Unggulan -->
+      <section id="fitur" class="py-12 px-4 sm:px-8 max-w-6xl mx-auto">
+        <div class="text-center max-w-2xl mx-auto mb-10">
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Fitur Lengkap Platform ARSign</h2>
+          <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">
+            Dirancang untuk efisiensi instansi dinas, korporasi, hingga pengguna perseorangan dengan kenyamanan ergonomis maksimal.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-start gap-4">
+            <div class="text-2xl p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 shrink-0">👁️</div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">TTE Visible & Invisible</h3>
+              <p class="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Pilih antara TTE Visible dengan stempel visual resmi di atas halaman, atau TTE Invisible yang menyematkan sertifikat digital murni ke struktur PDF tanpa mengubah tampilan berkas.
+              </p>
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-start gap-4">
+            <div class="text-2xl p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 shrink-0">📱</div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Spesimen Unggah & QR Code + Nama</h3>
+              <p class="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Bisa melampirkan spesimen tanda tangan gambar (PNG/JPG) atau berkas PDF. Jika tidak punya spesimen, sistem otomatis menyediakan stempel QR Code resmi dengan nama penanda tangan tercetak di bawahnya.
+              </p>
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-start gap-4">
+            <div class="text-2xl p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 shrink-0">🎯</div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Penyesuaian Posisi & Ukuran Interaktif</h3>
+              <p class="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Cukup klik langsung pada halaman pratinjau dokumen PDF untuk menentukan titik pembubuhan. Ukuran lebar, tinggi, dan nomor halaman dapat disesuaikan dengan mudah.
+              </p>
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-start gap-4">
+            <div class="text-2xl p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 shrink-0">🔐</div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Keamanan Berlapis: OTP & Passphrase</h3>
+              <p class="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Validasi OTP email menjamin keaslian email saat pembuatan akun. Otorisasi penandatanganan dikunci dengan Passphrase TTE pribadi agar tanda tangan tidak bisa diwakili orang lain.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Alur Penggunaan Aplikasi (Flowchart 1 to 5) -->
+      <section id="alur" class="py-14 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 sm:px-8">
+        <div class="max-w-6xl mx-auto">
+          <div class="text-center max-w-2xl mx-auto mb-12">
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Alur Penggunaan Aplikasi</h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">
+              Lima langkah mudah dari pembuatan akun hingga dokumen resmi bertanda tangan elektronik siap digunakan.
+            </p>
+          </div>
+
+          <!-- 5 Steps Flowchart -->
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <!-- Step 1 -->
+            <div class="p-5 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 relative flex flex-col justify-between">
+              <div>
+                <div class="w-8 h-8 rounded-xl bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center mb-3 shadow-md shadow-blue-500/20">
+                  1
+                </div>
+                <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-1">Daftar Akun & OTP</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                  Registrasi identitas resmi dan verifikasi kode OTP yang dikirimkan ke email aktif Anda.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-900 text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                Langkah 1/5
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="p-5 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 relative flex flex-col justify-between">
+              <div>
+                <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white font-extrabold text-xs flex items-center justify-center mb-3 shadow-md shadow-indigo-500/20">
+                  2
+                </div>
+                <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-1">Setel Passphrase</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                  Buat kode passphrase rahasia penandatanganan dengan verifikasi 2 kali konfirmasi input.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-900 text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                Langkah 2/5
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="p-5 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 relative flex flex-col justify-between">
+              <div>
+                <div class="w-8 h-8 rounded-xl bg-cyan-600 text-white font-extrabold text-xs flex items-center justify-center mb-3 shadow-md shadow-cyan-500/20">
+                  3
+                </div>
+                <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-1">Unggah & Atur Posisi</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                  Lampirkan berkas PDF, pilih mode Visible/Invisible, tentukan spesimen atau QR Code + nama.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-900 text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold">
+                Langkah 3/5
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="p-5 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 relative flex flex-col justify-between">
+              <div>
+                <div class="w-8 h-8 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center mb-3 shadow-md shadow-emerald-500/20">
+                  4
+                </div>
+                <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-1">Otorisasi Passphrase</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                  Klik tandatangani, pop-up otorisasi muncul meminta passphrase penandatanganan Anda.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-900 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                Langkah 4/5
+              </div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="p-5 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 relative flex flex-col justify-between">
+              <div>
+                <div class="w-8 h-8 rounded-xl bg-teal-600 text-white font-extrabold text-xs flex items-center justify-center mb-3 shadow-md shadow-teal-500/20">
+                  5
+                </div>
+                <h4 class="font-bold text-xs text-slate-900 dark:text-white mb-1">Unduh & Verifikasi</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                  Pop-up sukses tampil, unduh berkas PDF tersertifikasi atau verifikasi keabsahannya seketika.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-900 text-[10px] text-teal-600 dark:text-teal-400 font-semibold">
+                Langkah 5/5
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Call To Action Banner -->
+      <section class="py-14 px-4 sm:px-8 max-w-4xl mx-auto text-center">
+        <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white shadow-2xl relative overflow-hidden">
+          <div class="relative z-10">
+            <h2 class="text-2xl sm:text-3xl font-extrabold mb-3">Siap Menandatangani Dokumen Anda?</h2>
+            <p class="text-xs sm:text-sm text-blue-100 max-w-xl mx-auto mb-6">
+              Mulai sekarang dengan mudah dan aman. Dokumen PDF Anda akan memiliki kekuatan pembuktian hukum penuh dalam hitungan detik.
+            </p>
+            <button @click="goToAuth('login')"
+                    class="px-8 py-3.5 rounded-2xl bg-white text-blue-700 hover:bg-blue-50 font-extrabold text-sm shadow-xl transition transform hover:scale-105 inline-flex items-center gap-2">
+              <span>✍️</span>
+              <span>Tandatangani Berkas di Sini</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="mt-auto py-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p>© 2026 ARSign Digital Trust Platform. Memenuhi Standar ISO 32000-1 PAdES & Regulasi TTE Republik Indonesia.</p>
+      </footer>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- SCREEN 2: AUTHENTICATION GATEWAY (LOGIN & REGISTER DENGAN OTP)    -->
+    <!-- ================================================================= -->
+    <div v-else-if="currentScreen === 'auth' && !currentUser" class="min-h-screen w-full flex flex-col justify-center items-center p-4 bg-slate-100 dark:bg-slate-950 transition-colors overflow-y-auto">
+      
+      <!-- Top controls on Auth Screen -->
+      <div class="w-full max-w-md flex items-center justify-between mb-4">
+        <button @click="goToLanding" class="text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition">
+          <span>←</span> <span>Kembali ke Beranda</span>
+        </button>
+        <button @click="toggleTheme" class="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-blue-500 shadow-sm transition">
           <span v-if="theme === 'dark'">☀️</span>
           <span v-else>🌙</span>
         </button>
@@ -117,9 +442,6 @@
           </div>
           <h1 class="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">ARSign Digital Signature</h1>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Platform Layanan Tanda Tangan Elektronik Sah & Tersertifikasi</p>
-          <div class="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-            Tersertifikasi & Berstandar Keamanan Tertinggi
-          </div>
         </div>
 
         <!-- Auth Tabs Switch -->
@@ -134,7 +456,7 @@
           </button>
         </div>
 
-        <!-- FORM 1: LOGIN -->
+        <!-- FORM 1: LOGIN (NO OTP NEEDED) -->
         <form v-if="authTab === 'login'" @submit.prevent="login" class="space-y-4">
           <div v-if="loginForm.error" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
             {{ loginForm.error }}
@@ -155,11 +477,17 @@
           <button type="submit" :disabled="loginForm.loading"
                   class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-2">
             <span v-if="loginForm.loading" class="animate-spin text-sm">⏳</span>
-            <span>{{ loginForm.loading ? 'Memverifikasi Identitas...' : 'Masuk ke Layanan TTE' }}</span>
+            <span>{{ loginForm.loading ? 'Memverifikasi...' : 'Masuk ke Layanan TTE' }}</span>
           </button>
+
+          <div class="text-center pt-2">
+            <button type="button" @click="authTab = 'register'" class="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Belum punya akun? Buat akun baru di sini
+            </button>
+          </div>
         </form>
 
-        <!-- FORM 2: REGISTER -->
+        <!-- FORM 2: REGISTER (DENGAN VERIFIKASI OTP EMAIL HANYA SAAT REGISTRASI) -->
         <form v-if="authTab === 'register'" @submit.prevent="register" class="space-y-3">
           <div v-if="registerForm.error" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
             {{ registerForm.error }}
@@ -192,10 +520,37 @@
                    class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
           </div>
 
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Email (Wajib Aktif untuk OTP)</label>
-            <input v-model="registerForm.email" type="email" required placeholder="email@smallcircle.web.id"
-                   class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <!-- Email & OTP Verification Flow (KHUSUS REGISTRASI) -->
+          <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Aktif (Verifikasi OTP)</label>
+              <div class="flex gap-2">
+                <input v-model="registerForm.email" type="email" required :disabled="registerOtp.verified" placeholder="email@smallcircle.web.id"
+                       class="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-60">
+                <button type="button" @click="sendRegisterOtp" :disabled="registerOtp.loading || registerOtp.verified || (registerOtp.timer > 0 && registerOtp.sent)"
+                        class="px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition shrink-0">
+                  <span v-if="registerOtp.loading">Kirim...</span>
+                  <span v-else-if="registerOtp.sent && registerOtp.timer > 0 && !registerOtp.verified">{{ registerOtp.timer }}s</span>
+                  <span v-else-if="registerOtp.verified">Terverifikasi</span>
+                  <span v-else>Kirim OTP</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- OTP Input Field -->
+            <div v-if="registerOtp.sent && !registerOtp.verified" class="flex gap-2 pt-1">
+              <input v-model="registerOtp.input" type="text" maxlength="6" placeholder="Kode OTP 6-Digit"
+                     class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-center text-xs tracking-widest focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <button type="button" @click="verifyRegisterOtp" :disabled="registerOtp.loading || !registerOtp.input"
+                      class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-[11px] font-bold text-white transition shrink-0">
+                Verifikasi
+              </button>
+            </div>
+
+            <!-- Verified Badge -->
+            <div v-if="registerOtp.verified" class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <span>✓</span> <span>Email berhasil diverifikasi</span>
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-2">
@@ -211,11 +566,17 @@
             </div>
           </div>
 
-          <button type="submit" :disabled="registerForm.loading"
+          <button type="submit" :disabled="registerForm.loading || !registerOtp.verified"
                   class="w-full mt-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
             <span v-if="registerForm.loading" class="animate-spin text-sm">⏳</span>
-            <span>{{ registerForm.loading ? 'Menerbitkan Sertifikat Digital...' : 'Daftar & Terbitkan Sertifikat TTE' }}</span>
+            <span>{{ registerForm.loading ? 'Memproses Pendaftaran...' : 'Daftar & Buat Akun TTE' }}</span>
           </button>
+
+          <div class="text-center pt-2">
+            <button type="button" @click="authTab = 'login'" class="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Sudah punya akun? Masuk di sini
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -353,84 +714,125 @@
                 </div>
               </div>
 
-              <!-- 2. Identitas Penanda Tangan (Locked & Non-repudiation) -->
+              <!-- 2. Mode Tanda Tangan: Visible vs Invisible -->
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">2. Tipe Pembubuhan TTE</label>
+                <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <button type="button" @click="tteMode = 'visible'"
+                          class="py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5"
+                          :class="tteMode === 'visible' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'">
+                    <span>👁️</span> <span>TTE Visible</span>
+                  </button>
+                  <button type="button" @click="tteMode = 'invisible'"
+                          class="py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5"
+                          :class="tteMode === 'invisible' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'">
+                    <span>🔒</span> <span>TTE Invisible</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 3. Opsi Spesimen (Jika Mode Visible Aktif) -->
+              <div v-if="tteMode === 'visible'" class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300">3. Bentuk Stempel Visual</label>
+                  <div class="flex rounded-lg bg-slate-100 dark:bg-slate-950 p-0.5 border border-slate-200 dark:border-slate-800 text-[10px]">
+                    <button type="button" @click="specimenSource = 'qrcode'" class="px-2 py-0.5 rounded font-bold transition"
+                            :class="specimenSource === 'qrcode' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500'">
+                      QR Code + Nama
+                    </button>
+                    <button type="button" @click="specimenSource = 'file'" class="px-2 py-0.5 rounded font-bold transition"
+                            :class="specimenSource === 'file' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500'">
+                      Unggah File
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Case 3A: QR Code + Nama di Bawah QR Code -->
+                <div v-if="specimenSource === 'qrcode'" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
+                  <div class="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <span>📱</span> <span>Stempel QR Code & Nama Penanda Tangan</span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                    Stempel otomatis menyematkan QR verifikasi resmi ARSign dengan nama <strong>{{ currentUser.fullname }}</strong> tercetak di bawahnya.
+                  </div>
+                </div>
+
+                <!-- Case 3B: Unggah Berkas Spesimen (PDF atau Gambar) -->
+                <div v-else class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <label class="flex-1 cursor-pointer flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 bg-slate-50 dark:bg-slate-950 text-xs text-slate-600 dark:text-slate-300 transition">
+                      <span>🖼️</span>
+                      <span class="truncate">{{ specimenImage ? 'Ganti Spesimen...' : 'Pilih Berkas Gambar/PDF...' }}</span>
+                      <input type="file" accept="image/png,image/jpeg,application/pdf" @change="handleSpecimenFileUpload" class="hidden">
+                    </label>
+                    <button type="button" @click="openSpecimenModal" class="px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                      Coret Manual
+                    </button>
+                  </div>
+                  <div v-if="specimenImage" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-3">
+                    <div class="w-14 h-9 rounded bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden">
+                      <img :src="specimenImage" class="max-h-full max-w-full object-contain">
+                    </div>
+                    <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Spesimen Terpasang</span>
+                  </div>
+                </div>
+
+                <!-- Penyesuaian Ukuran & Letak Stempel -->
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+                  <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    <span>Posisi & Ukuran Stempel</span>
+                    <span class="text-[10px] text-blue-600 dark:text-blue-400 font-mono">X:{{ specimenCustomX }}, Y:{{ specimenCustomY }}</span>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2 text-[11px]">
+                    <div>
+                      <span class="text-[10px] text-slate-400 block mb-0.5">Lebar (px)</span>
+                      <input v-model.number="specimenWidth" type="number" min="100" max="400"
+                             class="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-mono">
+                    </div>
+                    <div>
+                      <span class="text-[10px] text-slate-400 block mb-0.5">Tinggi (px)</span>
+                      <input v-model.number="specimenHeight" type="number" min="50" max="300"
+                             class="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-mono">
+                    </div>
+                    <div>
+                      <span class="text-[10px] text-slate-400 block mb-0.5">Halaman</span>
+                      <select v-model.number="specimenPage" class="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-mono">
+                        <option v-for="p in pdfTotalPages" :key="p" :value="p">Hal {{ p }}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p class="text-[10px] text-slate-500 italic">💡 Tips: Klik langsung pada preview lembar dokumen PDF untuk menggeser letak stempel secara presisi.</p>
+                </div>
+              </div>
+
+              <!-- Case 2B: Invisible Notice -->
+              <div v-else class="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                ℹ️ <strong>Mode TTE Invisible:</strong> Sertifikat tanda tangan elektronik akan disematkan ke dalam metadata kriptografi dokumen sesuai ISO 32000-1 tanpa menambahkan stempel visual di atas halaman.
+              </div>
+
+              <!-- Identitas Penanda Tangan (Locked & Non-repudiation) -->
               <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                <div class="flex items-center justify-between mb-1">
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">2. Identitas Sah Penanda Tangan</span>
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Penanda Tangan Sah</span>
                   <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                     <span>🛡️</span> <span>Terkunci & Sah</span>
                   </span>
                 </div>
                 <div class="text-xs font-bold text-slate-900 dark:text-white">{{ currentUser.fullname }}</div>
-                <div class="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between mt-0.5">
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex justify-between">
                   <span>{{ currentUser.institution }}</span>
-                  <span class="font-mono text-[10px]">{{ currentUser.nik_nip }}</span>
-                </div>
-              </div>
-
-              <!-- 3. Spesimen Visual Tanda Tangan -->
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300">3. Spesimen Tanda Tangan</label>
-                  <button type="button" @click="openSpecimenModal" class="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold">
-                    {{ specimenImage ? 'Ubah / Buat Baru' : '+ Buat Spesimen' }}
-                  </button>
-                </div>
-                <div class="flex items-center gap-3 p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-                  <div class="w-16 h-10 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden">
-                    <img v-if="specimenImage" :src="specimenImage" class="max-h-full max-w-full object-contain">
-                    <span v-else class="text-[9px] text-slate-400">Kosong</span>
-                  </div>
-                  <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                    <div class="font-semibold text-slate-700 dark:text-slate-300">{{ specimenImage ? 'Spesimen Siap Disematkan' : 'Gunakan spesimen default atau buat coretan baru' }}</div>
-                    <div>Stempel stempel digital ARSign & QR verifikasi otomatis dibubuhkan.</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 5. 2FA Email OTP Verification -->
-              <div>
-                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">5. Verifikasi 2FA OTP (Otorisasi)</label>
-                <div class="flex items-center gap-2">
-                  <input v-model="otpInput" type="text" maxlength="6" placeholder="Kode OTP 6-Digit"
-                         class="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-mono text-center text-xs tracking-widest focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                  <button type="button" @click="sendOtp" :disabled="otpLoading || otpTimer > 0 && otpSent"
-                          class="px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition">
-                    <span v-if="otpLoading">Mengirim...</span>
-                    <span v-else-if="otpSent && otpTimer > 0">{{ otpTimer }}s</span>
-                    <span v-else>Kirim OTP</span>
-                  </button>
-                  <button type="button" @click="verifyOtp" :disabled="otpLoading || !otpInput"
-                          class="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-[11px] font-bold text-white transition">
-                    Verifikasi
-                  </button>
-                </div>
-                <div class="flex items-center justify-between text-[10px] mt-1 text-slate-500">
-                  <span>Ke: {{ currentUser.email }}</span>
-                  <span v-if="otpVerified" class="text-emerald-600 dark:text-emerald-400 font-bold">✓ OTP Terverifikasi</span>
+                  <span class="font-mono">{{ currentUser.nik_nip }}</span>
                 </div>
               </div>
             </div>
 
-            <!-- 6. Big Action Button (Bottom) -->
+            <!-- Big Action Button (Bottom) -->
             <div class="pt-3 border-t border-slate-200 dark:border-slate-800">
-              <button type="button" @click="signDocument" :disabled="isSigning"
+              <button type="button" @click="openSigningPassphraseModal" :disabled="isSigning"
                       class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 transition flex items-center justify-center gap-2">
-                <span v-if="isSigning" class="animate-spin text-sm">⏳</span>
-                <span>{{ isSigning ? 'Memproses Penandatanganan...' : 'Tanda Tangani Dokumen Sekarang' }}</span>
+                <span>✍️</span>
+                <span>Tandatangani Berkas Sekarang</span>
               </button>
-
-              <!-- Result Notice Card if available -->
-              <div v-if="signedResult" class="mt-2 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between text-xs">
-                <div>
-                  <div class="font-bold text-emerald-800 dark:text-emerald-300">✓ TTE Berhasil Disematkan</div>
-                  <div class="text-[10px] text-emerald-600 dark:text-emerald-400">ID: {{ signedResult.receipt_id }} ({{ signedResult.duration_ms }} ms)</div>
-                </div>
-                <a :href="signedResult.pdf_blob_url" :download="signedResult.file_name"
-                   class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-sm">
-                  <span>⬇️</span> <span>Unduh PDF</span>
-                </a>
-              </div>
             </div>
           </div>
 
@@ -474,20 +876,42 @@
                 <!-- Interactive Overlay for Click Targeting -->
                 <div ref="pdfOverlay" @click="handlePdfOverlayClick" class="absolute inset-0 cursor-crosshair z-10">
                   
-                  <!-- Signature Stamp Target Indicator -->
-                  <div class="absolute border-2 border-dashed border-blue-500 bg-blue-500/10 rounded-lg flex flex-col justify-between p-2 shadow-sm pointer-events-none transition-all duration-75"
+                  <!-- Signature Stamp Target Indicator (Visible only if tteMode === 'visible') -->
+                  <div v-if="tteMode === 'visible'"
+                       class="absolute border-2 border-dashed border-blue-500 bg-blue-500/10 rounded-lg flex flex-col justify-between p-2 shadow-sm pointer-events-none transition-all duration-75"
                        :style="getSpecimenBoxStyle()">
                     <div class="flex items-center justify-between text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-white/90 dark:bg-slate-900/90 px-1 py-0.5 rounded">
                       <span>Stempel ARSign TTE</span>
-                      <span>X:{{ specimenCustomX }}, Y:{{ specimenCustomY }}</span>
+                      <span>Hal {{ specimenPage }}</span>
                     </div>
-                    <div class="flex items-center justify-center flex-1">
-                      <img v-if="specimenImage" :src="specimenImage" class="max-h-full max-w-full object-contain opacity-80">
-                      <span v-else class="text-[9px] text-blue-700 dark:text-blue-300 font-semibold">[Area Tanda Tangan]</span>
+
+                    <!-- Mode File (Gambar / PDF) -->
+                    <div v-if="specimenSource === 'file'" class="flex items-center justify-center flex-1 overflow-hidden my-1">
+                      <img v-if="specimenImage" :src="specimenImage" class="max-h-full max-w-full object-contain opacity-85">
+                      <span v-else class="text-[9px] text-blue-700 dark:text-blue-300 font-semibold">[Area Spesimen File]</span>
                     </div>
-                    <div class="text-[8px] text-slate-500 text-center font-mono">
-                      {{ currentUser.fullname }}
+
+                    <!-- Mode QR Code + Nama di Bawah QR Code -->
+                    <div v-else class="flex flex-col items-center justify-center flex-1 my-1">
+                      <div class="w-7 h-7 rounded bg-blue-900 text-white text-[9px] font-bold flex items-center justify-center shadow-xs mb-1">
+                        📱 QR
+                      </div>
+                      <div class="text-[8px] font-bold text-blue-950 dark:text-blue-200 text-center leading-tight">
+                        {{ currentUser.fullname }}
+                      </div>
+                      <div class="text-[7px] text-slate-500 text-center leading-none mt-0.5">
+                        Ditandatangani secara elektronik
+                      </div>
                     </div>
+
+                    <div class="text-[8px] text-slate-500 text-center font-mono bg-white/80 dark:bg-slate-900/80 rounded px-1">
+                      X:{{ specimenCustomX }}, Y:{{ specimenCustomY }}
+                    </div>
+                  </div>
+
+                  <!-- Invisible Mode Indicator on Canvas -->
+                  <div v-else class="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-slate-900/90 text-white text-xs font-bold border border-slate-700 shadow-xl pointer-events-none flex items-center gap-2">
+                    <span>🔒</span> <span>Mode TTE Invisible Aktif (Tanpa Stempel Visual di Halaman)</span>
                   </div>
 
                 </div>
@@ -917,6 +1341,150 @@
         <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
           <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Tersertifikasi ARSign Trust Network</span>
           <button @click="closeDetailModal" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL 3: SETEL PASSPHRASE TTE ONBOARDING (REKAP 2x FIELD)         -->
+    <!-- ================================================================= -->
+    <div v-if="showPassphraseSetupModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm select-none">
+      <div class="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl">
+        <div class="text-center mb-5">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center text-2xl mb-3 border border-blue-200 dark:border-blue-800">
+            🔐
+          </div>
+          <h2 class="text-base font-extrabold text-slate-900 dark:text-white">Buat Passphrase TTE Anda</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Passphrase berfungsi sebagai otorisasi keamanan setiap kali Anda menandatangani dokumen elektronik.
+          </p>
+        </div>
+
+        <form @submit.prevent="savePassphrase" class="space-y-4">
+          <div v-if="passphraseForm.error" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
+            {{ passphraseForm.error }}
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Passphrase Penandatanganan Baru</label>
+            <input v-model="passphraseForm.passphrase" type="password" required placeholder="Minimal 6 karakter rahasia" minlength="6"
+                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Ulangi Konfirmasi Passphrase</label>
+            <input v-model="passphraseForm.confirm_passphrase" type="password" required placeholder="Ketik ulang passphrase" minlength="6"
+                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div class="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-[11px] text-blue-700 dark:text-blue-300 leading-relaxed">
+            ℹ️ <strong>Penting:</strong> Tanda tangan elektronik bersifat personal dan tidak dapat diwakilkan. Jaga kerahasiaan passphrase Anda.
+          </div>
+
+          <button type="submit" :disabled="passphraseForm.loading"
+                  class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+            <span v-if="passphraseForm.loading" class="animate-spin text-sm">⏳</span>
+            <span>{{ passphraseForm.loading ? 'Menyimpan...' : 'Aktifkan Passphrase & Lanjutkan' }}</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL 4: POP-UP TENGAH LAYAR UNTUK PASSPHRASE SAAT TTE            -->
+    <!-- ================================================================= -->
+    <div v-if="showSigningPassphraseModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm select-none">
+      <div class="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl">
+        <div class="text-center mb-5">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-2xl mb-3 border border-indigo-200 dark:border-indigo-800">
+            ✍️
+          </div>
+          <h2 class="text-base font-extrabold text-slate-900 dark:text-white">Otorisasi Penandatanganan</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Masukkan passphrase Anda untuk mengesahkan berkas:
+          </p>
+          <div class="mt-2 inline-block px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-300 truncate max-w-full">
+            📄 {{ fileName || 'dokumen.pdf' }}
+          </div>
+        </div>
+
+        <form @submit.prevent="confirmAndSignDocument" class="space-y-4">
+          <div v-if="signingPassphraseError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
+            {{ signingPassphraseError }}
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Passphrase Penandatanganan</label>
+            <input v-model="signingPassphraseInput" type="password" required autofocus placeholder="Ketik passphrase Anda..."
+                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none text-center font-mono tracking-wider">
+          </div>
+
+          <div class="flex items-center gap-2 pt-2">
+            <button type="button" @click="showSigningPassphraseModal = false" :disabled="signingPassphraseLoading"
+                    class="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition">
+              Batal
+            </button>
+            <button type="submit" :disabled="signingPassphraseLoading || !signingPassphraseInput"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+              <span v-if="signingPassphraseLoading" class="animate-spin text-sm">⏳</span>
+              <span>{{ signingPassphraseLoading ? 'Membubuhi...' : 'Bubuhi Tanda Tangan' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL 5: POP-UP SUKSES & TAWARAN VERIFIKASI KEABSAHAN DOKUMEN     -->
+    <!-- ================================================================= -->
+    <div v-if="showSuccessModal && signedResult" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm select-none">
+      <div class="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl">
+        <div class="text-center mb-5">
+          <div class="w-14 h-14 mx-auto rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center justify-center text-3xl mb-3 shadow-lg shadow-emerald-500/10">
+            🎉
+          </div>
+          <h2 class="text-base font-extrabold text-slate-900 dark:text-white">Dokumen Berhasil Ditandatangani!</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Tanda tangan elektronik tersertifikasi sah telah berhasil disematkan.
+          </p>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1.5 mb-5 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500 dark:text-slate-400">Berkas:</span>
+            <span class="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{{ signedResult.file_name }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500 dark:text-slate-400">No. Registrasi:</span>
+            <span class="font-mono font-bold text-blue-600 dark:text-blue-400">{{ signedResult.receipt_id }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500 dark:text-slate-400">Penanda Tangan:</span>
+            <span class="font-semibold text-slate-900 dark:text-white">{{ signedResult.signer_fullname }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500 dark:text-slate-400">Waktu:</span>
+            <span class="text-slate-600 dark:text-slate-300">{{ signedResult.signed_at }}</span>
+          </div>
+        </div>
+
+        <div class="space-y-2.5">
+          <button @click="downloadSignedPdf"
+                  class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-2">
+            <span>⬇️</span>
+            <span>Unduh Berkas PDF Resmi</span>
+          </button>
+
+          <button @click="openVerificationFromSuccess"
+                  class="w-full py-2.5 px-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition flex items-center justify-center gap-2">
+            <span>🔍</span>
+            <span>Verifikasi Keabsahan Dokumen Ini Sekarang</span>
+          </button>
+
+          <button @click="showSuccessModal = false"
+                  class="w-full py-1.5 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition">
             Tutup
           </button>
         </div>

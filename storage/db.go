@@ -45,18 +45,20 @@ type RegistryEntry struct {
 }
 
 type User struct {
-	ID                string `json:"id"`
-	Username          string `json:"username"`
-	PasswordHash      string `json:"password_hash,omitempty"`
-	FullName          string `json:"fullname"`
-	NikNip            string `json:"nik_nip"`
-	Institution       string `json:"institution"`
-	Email             string `json:"email"`
-	Role              string `json:"role"` // "ASN", "PUBLIC", "ADMIN"
-	MldsaPublicKey    string `json:"mldsa_public_key"`
-	MldsaPrivateKey   string `json:"mldsa_private_key,omitempty"`
-	SpecimenSignature string `json:"specimen_signature,omitempty"`
-	CreatedAt         string `json:"created_at"`
+	ID                   string `json:"id"`
+	Username             string `json:"username"`
+	PasswordHash         string `json:"password_hash,omitempty"`
+	FullName             string `json:"fullname"`
+	NikNip               string `json:"nik_nip"`
+	Institution          string `json:"institution"`
+	Email                string `json:"email"`
+	Role                 string `json:"role"` // "ASN", "PUBLIC", "ADMIN"
+	MldsaPublicKey       string `json:"mldsa_public_key"`
+	MldsaPrivateKey      string `json:"mldsa_private_key,omitempty"`
+	SpecimenSignature    string `json:"specimen_signature,omitempty"`
+	SigningPassphraseHash string `json:"signing_passphrase_hash,omitempty"`
+	HasPassphrase        bool   `json:"has_passphrase"`
+	CreatedAt            string `json:"created_at"`
 }
 
 func HashPassword(pwd string) string {
@@ -136,6 +138,7 @@ func InitStorage(dbPath string) (*Storage, error) {
 
 	_, _ = db.Exec("ALTER TABLE document_registry ADD COLUMN username TEXT DEFAULT ''")
 	_, _ = db.Exec("ALTER TABLE users ADD COLUMN specimen_signature TEXT DEFAULT ''")
+	_, _ = db.Exec("ALTER TABLE users ADD COLUMN signing_passphrase_hash TEXT DEFAULT ''")
 
 	s := &Storage{db: db}
 	s.seedInitialData()
@@ -238,13 +241,23 @@ func (s *Storage) GetUserByUsername(username string) (*User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `SELECT id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, COALESCE(specimen_signature, ''), created_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, COALESCE(specimen_signature, ''), COALESCE(signing_passphrase_hash, ''), created_at FROM users WHERE username = ?`
 	var u User
-	err := s.db.QueryRow(query, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.MldsaPrivateKey, &u.SpecimenSignature, &u.CreatedAt)
+	err := s.db.QueryRow(query, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.MldsaPrivateKey, &u.SpecimenSignature, &u.SigningPassphraseHash, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+	u.HasPassphrase = (u.SigningPassphraseHash != "")
 	return &u, nil
+}
+
+func (s *Storage) UpdateUserPassphrase(username, passHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `UPDATE users SET signing_passphrase_hash = ? WHERE username = ?`
+	_, err := s.db.Exec(query, passHash, username)
+	return err
 }
 
 func (s *Storage) UpdateUserPassword(username, newPassHash, newEncKey string) error {

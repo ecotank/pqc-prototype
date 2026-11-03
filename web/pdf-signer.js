@@ -27,7 +27,7 @@ window.PDFSigner = (function() {
       const fontNorm = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
       page.drawText('ARSIGN POST-QUANTUM SIGNATURE', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
-      page.drawText('PLATFORM TTE PASCAKUANTUM RESMI (NIST FIPS 204)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+      page.drawText('PLATFORM TTE SAH TERSERTIFIKASI', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
       page.drawLine({
         start: { x: 50, y: 760 },
         end: { x: 545, y: 760 },
@@ -53,165 +53,181 @@ window.PDFSigner = (function() {
     }
     const { width, height } = targetPage.getSize();
 
-    // 1. Buat QR Code Verifikasi Berbasis URL Resmi ARSign
-    const qrDataUrl = await QRCode.toDataURL(`https://smallcircle.web.id/verify/${opts.receiptId}`, {
-      width: 140,
-      margin: 1,
-      color: { dark: '#002952', light: '#FFFFFF' }
-    });
-    const qrImage = await pdfDoc.embedPng(qrDataUrl);
+    const isInvisible = opts.invisible === true || opts.mode === 'invisible';
 
-    // 2. Embed Gambar Spesimen Tanda Tangan Pengguna jika Disediakan
-    let specimenEmbed = null;
-    if (opts.specimenDataUrl) {
-      try {
-        if (opts.specimenDataUrl.includes('image/jpeg') || opts.specimenDataUrl.includes('image/jpg')) {
-          specimenEmbed = await pdfDoc.embedJpg(opts.specimenDataUrl);
-        } else {
-          specimenEmbed = await pdfDoc.embedPng(opts.specimenDataUrl);
+    let posX = 0, posY = 0, boxW = 0, boxH = 0;
+
+    if (!isInvisible) {
+      // 1. Buat QR Code Verifikasi Berbasis URL Resmi ARSign
+      const qrDataUrl = await QRCode.toDataURL(`https://smallcircle.web.id/verify/${opts.receiptId}`, {
+        width: 160,
+        margin: 1,
+        color: { dark: '#002952', light: '#FFFFFF' }
+      });
+      const qrImage = await pdfDoc.embedPng(qrDataUrl);
+
+      // 2. Embed Gambar Spesimen Tanda Tangan Pengguna jika Disediakan
+      let specimenEmbed = null;
+      if (opts.specimenDataUrl && opts.stampType !== 'qrcode_name') {
+        try {
+          if (opts.specimenDataUrl.includes('image/jpeg') || opts.specimenDataUrl.includes('image/jpg')) {
+            specimenEmbed = await pdfDoc.embedJpg(opts.specimenDataUrl);
+          } else {
+            specimenEmbed = await pdfDoc.embedPng(opts.specimenDataUrl);
+          }
+        } catch (embedErr) {
+          console.warn('Gagal memuat gambar spesimen visual:', embedErr);
         }
-      } catch (embedErr) {
-        console.warn('Gagal memuat gambar spesimen visual, fallback ke segel teks:', embedErr);
+      }
+
+      // 3. Tentukan Dimensi Ukuran Box Visual (Bebas Custom Pixel)
+      boxW = Math.max(90, Math.min(width - 20, Number(opts.customW) || 210));
+      boxH = Math.max(45, Math.min(height - 20, Number(opts.customH) || 92));
+
+      // 4. Tentukan Koordinat Box Visual (Bebas Custom Pixel & Preset)
+      posX = width - boxW - 35;
+      posY = 50;
+
+      if (opts.position === 'bottom-left') {
+        posX = 45;
+        posY = 50;
+      } else if (opts.position === 'center') {
+        posX = (width / 2) - (boxW / 2);
+        posY = 50;
+      } else if (opts.position === 'top-right') {
+        posX = width - boxW - 35;
+        posY = height - boxH - 50;
+      } else if (opts.position === 'top-left') {
+        posX = 45;
+        posY = height - boxH - 50;
+      } else if (opts.position === 'center-middle') {
+        posX = (width / 2) - (boxW / 2);
+        posY = (height / 2) - (boxH / 2);
+      } else if (opts.position === 'custom' || typeof opts.customX === 'number') {
+        posX = Number(opts.customX);
+        posY = Number(opts.customY);
+      }
+
+      // Pastikan tidak tembus keluar batas halaman (clamping)
+      posX = Math.max(5, Math.min(posX, width - boxW - 5));
+      posY = Math.max(5, Math.min(posY, height - boxH - 5));
+
+      const fontHeader = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+      const fontBody = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
+      // 5. Gambar Box Bingkai Resmi ARSign
+      targetPage.drawRectangle({
+        x: posX,
+        y: posY,
+        width: boxW,
+        height: boxH,
+        borderColor: PDFLib.rgb(0.08, 0.32, 0.72),
+        borderWidth: 1.2,
+        color: PDFLib.rgb(0.97, 0.985, 1.0)
+      });
+
+      const pad = Math.max(4, Math.min(8, boxH * 0.08));
+
+      if (specimenEmbed) {
+        // Mode dengan Spesimen Gambar: QR di kiri, Spesimen di kanan atas, Nama di bawah
+        const qrSize = Math.max(26, Math.min(boxH - (pad * 2), boxW * 0.32));
+        const qrX = posX + pad;
+        const qrY = posY + (boxH - qrSize) / 2;
+
+        targetPage.drawImage(qrImage, {
+          x: qrX,
+          y: qrY,
+          width: qrSize,
+          height: qrSize
+        });
+
+        const contentX = qrX + qrSize + pad;
+        const contentW = Math.max(30, (posX + boxW - pad) - contentX);
+        const contentH = boxH - (pad * 2);
+
+        const fontSizeSigner = Math.max(5.5, Math.min(9.5, boxH * 0.09));
+        const fontSizeBody = Math.max(4.5, Math.min(7.5, boxH * 0.07));
+        const lineSpacing = fontSizeBody + 3;
+
+        const specH = Math.max(16, contentH - (3 * lineSpacing) - 2);
+        const specY = posY + pad + (3 * lineSpacing) + 2;
+
+        targetPage.drawImage(specimenEmbed, {
+          x: contentX,
+          y: specY,
+          width: contentW,
+          height: specH
+        });
+
+        targetPage.drawText('Ditandatangani secara elektronik:', {
+          x: contentX,
+          y: posY + pad + (lineSpacing * 2),
+          size: fontSizeBody,
+          font: fontBody,
+          color: PDFLib.rgb(0.25, 0.25, 0.25)
+        });
+
+        targetPage.drawText(opts.signerName || 'Penanda Tangan', {
+          x: contentX,
+          y: posY + pad + lineSpacing,
+          size: fontSizeSigner,
+          font: fontHeader,
+          color: PDFLib.rgb(0.0, 0.2, 0.6)
+        });
+
+        targetPage.drawText(`No. Reg: ${opts.receiptId}`, {
+          x: contentX,
+          y: posY + pad,
+          size: Math.max(4, fontSizeBody - 0.5),
+          font: fontBody,
+          color: PDFLib.rgb(0.4, 0.4, 0.4)
+        });
+      } else {
+        // Mode QR Code + Nama di Bawah QR Code (Sesuai Permintaan)
+        // Posisi: QR Code di atas/tengah, Nama di bawah QR Code
+        const textAreaHeight = Math.max(24, boxH * 0.38);
+        const qrSize = Math.max(24, Math.min(boxH - textAreaHeight - (pad * 2), boxW - (pad * 2)));
+        const qrX = posX + (boxW - qrSize) / 2;
+        const qrY = posY + textAreaHeight + (pad / 2);
+
+        targetPage.drawImage(qrImage, {
+          x: qrX,
+          y: qrY,
+          width: qrSize,
+          height: qrSize
+        });
+
+        const fontSizeSigner = Math.max(6, Math.min(10, boxH * 0.11));
+        const fontSizeBody = Math.max(4.5, Math.min(7, boxH * 0.07));
+
+        const signerName = opts.signerName || 'Penanda Tangan';
+        const nameWidth = fontHeader.widthOfTextAtSize(signerName, fontSizeSigner);
+        const nameX = Math.max(posX + 4, posX + (boxW - nameWidth) / 2);
+
+        targetPage.drawText(signerName, {
+          x: nameX,
+          y: posY + textAreaHeight - fontSizeSigner - 2,
+          size: fontSizeSigner,
+          font: fontHeader,
+          color: PDFLib.rgb(0.05, 0.2, 0.55)
+        });
+
+        const subText = 'Ditandatangani secara elektronik';
+        const subWidth = fontBody.widthOfTextAtSize(subText, fontSizeBody);
+        const subX = Math.max(posX + 4, posX + (boxW - subWidth) / 2);
+
+        targetPage.drawText(subText, {
+          x: subX,
+          y: posY + pad + 2,
+          size: fontSizeBody,
+          font: fontBody,
+          color: PDFLib.rgb(0.35, 0.35, 0.35)
+        });
       }
     }
 
-    // 3. Tentukan Dimensi Ukuran Box Visual (Bebas Custom Pixel)
-    const boxW = Math.max(90, Math.min(width - 20, Number(opts.customW) || 210));
-    const boxH = Math.max(45, Math.min(height - 20, Number(opts.customH) || 92));
-
-    // 4. Tentukan Koordinat Box Visual (Bebas Custom Pixel & Preset)
-    let posX = width - boxW - 35;
-    let posY = 50;
-
-    if (opts.position === 'bottom-left') {
-      posX = 45;
-      posY = 50;
-    } else if (opts.position === 'center') {
-      posX = (width / 2) - (boxW / 2);
-      posY = 50;
-    } else if (opts.position === 'top-right') {
-      posX = width - boxW - 35;
-      posY = height - boxH - 50;
-    } else if (opts.position === 'top-left') {
-      posX = 45;
-      posY = height - boxH - 50;
-    } else if (opts.position === 'center-middle') {
-      posX = (width / 2) - (boxW / 2);
-      posY = (height / 2) - (boxH / 2);
-    } else if (opts.position === 'custom' || typeof opts.customX === 'number') {
-      posX = Number(opts.customX);
-      posY = Number(opts.customY);
-    }
-
-    // Pastikan tidak tembus keluar batas halaman (clamping)
-    posX = Math.max(5, Math.min(posX, width - boxW - 5));
-    posY = Math.max(5, Math.min(posY, height - boxH - 5));
-
-    const fontHeader = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-    const fontBody = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-
-    // 5. Gambar Box Bingkai Resmi ARSign
-    targetPage.drawRectangle({
-      x: posX,
-      y: posY,
-      width: boxW,
-      height: boxH,
-      borderColor: PDFLib.rgb(0.1, 0.35, 0.75),
-      borderWidth: 1.2,
-      color: PDFLib.rgb(0.97, 0.985, 1.0)
-    });
-
-    // 6. Tata Letak Proporsional Komponen di Dalam Box
-    const pad = Math.max(4, Math.min(8, boxH * 0.08));
-    const qrSize = Math.max(26, Math.min(boxH - (pad * 2), boxW * 0.32));
-    const qrX = posX + pad;
-    const qrY = posY + (boxH - qrSize) / 2;
-
-    targetPage.drawImage(qrImage, {
-      x: qrX,
-      y: qrY,
-      width: qrSize,
-      height: qrSize
-    });
-
-    const contentX = qrX + qrSize + pad;
-    const contentW = Math.max(30, (posX + boxW - pad) - contentX);
-    const contentH = boxH - (pad * 2);
-
-    // Skala Font dan Jarak Baris
-    const fontSizeSigner = Math.max(5.5, Math.min(9.5, boxH * 0.09));
-    const fontSizeBody = Math.max(4.5, Math.min(7.5, boxH * 0.07));
-    const lineSpacing = fontSizeBody + 3;
-
-    // Area Spesimen Gambar / Banner Segel
-    const specH = Math.max(16, contentH - (3 * lineSpacing) - 2);
-    const specY = posY + pad + (3 * lineSpacing) + 2;
-
-    if (specimenEmbed) {
-      targetPage.drawImage(specimenEmbed, {
-        x: contentX,
-        y: specY,
-        width: contentW,
-        height: specH
-      });
-    } else {
-      // Banner Segel Resmi ARSign Trust Network jika gambar spesimen pribadi tidak diunggah
-      targetPage.drawRectangle({
-        x: contentX,
-        y: specY,
-        width: contentW,
-        height: specH,
-        color: PDFLib.rgb(0.05, 0.22, 0.52),
-        borderWidth: 0
-      });
-
-      const bannerTitleSize = Math.max(5, Math.min(8, specH * 0.36));
-      const bannerSubSize = Math.max(4, Math.min(6.5, specH * 0.28));
-
-      targetPage.drawText('SEGEL DIGITAL RESMI ARSIGN', {
-        x: contentX + 4,
-        y: specY + (specH / 2) + 1,
-        size: bannerTitleSize,
-        font: fontHeader,
-        color: PDFLib.rgb(1, 1, 1)
-      });
-
-      targetPage.drawText('ARSIGN POST-QUANTUM SIGNATURE', {
-        x: contentX + 4,
-        y: specY + (specH / 2) - bannerSubSize - 1,
-        size: bannerSubSize,
-        font: fontBody,
-        color: PDFLib.rgb(0.82, 0.9, 1.0)
-      });
-    }
-
-    // 7. Label Teks Legitimasi TTE Pascakuantum
-    targetPage.drawText('Ditandatangani secara elektronik:', {
-      x: contentX,
-      y: posY + pad + (lineSpacing * 2),
-      size: fontSizeBody,
-      font: fontBody,
-      color: PDFLib.rgb(0.25, 0.25, 0.25)
-    });
-
-    targetPage.drawText(opts.signerName || 'Pejabat Penandatangan', {
-      x: contentX,
-      y: posY + pad + lineSpacing,
-      size: fontSizeSigner,
-      font: fontHeader,
-      color: PDFLib.rgb(0.0, 0.2, 0.6)
-    });
-
-    targetPage.drawText(`No. Reg: ${opts.receiptId} • ML-DSA FIPS 204`, {
-      x: contentX,
-      y: posY + pad,
-      size: Math.max(4, fontSizeBody - 0.5),
-      font: fontBody,
-      color: PDFLib.rgb(0.4, 0.4, 0.4)
-    });
-
     // 8. Integrasikan Struktur Tanda Tangan ISO 32000-1 PAdES (/AcroForm, /Widget /FT /Sig, /Type /Sig)
-    const placeholderLength = 32768; // 32768 byte = 65536 hex char (cukup untuk PKCS#7 + ML-DSA + Cert Chain)
+    const placeholderLength = 32768; // 32768 byte = 65536 hex char
     const placeholderHex = '0'.repeat(placeholderLength * 2);
     const byteRangePlaceholder = [0, 1000000000, 1000000000, 1000000000];
 
@@ -221,7 +237,7 @@ window.PDFSigner = (function() {
       SubFilter: 'adbe.pkcs7.detached',
       ByteRange: byteRangePlaceholder,
       Contents: PDFLib.PDFHexString.of(placeholderHex),
-      Reason: PDFLib.PDFString.of('TTE Pascakuantum Sah ARSign - FIPS 204 ML-DSA-65'),
+      Reason: PDFLib.PDFString.of('Tanda Tangan Elektronik Sah Tersertifikasi ARSign'),
       M: PDFLib.PDFString.of('D:' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + "+07'00'"),
       Name: PDFLib.PDFString.of(opts.signerName || 'Penanda Tangan ARSign'),
       Location: PDFLib.PDFString.of('Jakarta, Indonesia'),
@@ -229,15 +245,16 @@ window.PDFSigner = (function() {
     });
     const sigRef = pdfDoc.context.register(sigDict);
 
-    // Hubungkan box visual spesimen langsung ke Signature Field agar klik stempel membuka Signature Properties di Acrobat/BeSign
+    // Signature Field Widget (Visible rect or Invisible [0,0,0,0])
+    const widgetRect = isInvisible ? [0, 0, 0, 0] : [posX, posY, posX + boxW, posY + boxH];
     const widgetDict = pdfDoc.context.obj({
       Type: 'Annot',
       Subtype: 'Widget',
       FT: 'Sig',
-      Rect: [posX, posY, posX + boxW, posY + boxH],
+      Rect: widgetRect,
       V: sigRef,
       T: PDFLib.PDFString.of('ARS_SIG_' + opts.receiptId),
-      F: 4,
+      F: isInvisible ? 0 : 4,
       P: targetPage.ref
     });
     const widgetRef = pdfDoc.context.register(widgetDict);

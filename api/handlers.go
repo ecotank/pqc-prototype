@@ -508,6 +508,62 @@ func (h *APIHandler) HandleUpdateSpecimen(w http.ResponseWriter, r *http.Request
 	SendSuccess(w, nil, "Spesimen tanda tangan berhasil disimpan")
 }
 
+type PassphraseReq struct {
+	Username   string `json:"username"`
+	Passphrase string `json:"passphrase"`
+}
+
+func (h *APIHandler) HandleSetPassphrase(w http.ResponseWriter, r *http.Request) {
+	var req PassphraseReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" || strings.TrimSpace(req.Passphrase) == "" {
+		SendError(w, http.StatusBadRequest, "Nama pengguna dan passphrase wajib diisi")
+		return
+	}
+	user, err := h.store.GetUserByUsername(strings.TrimSpace(req.Username))
+	if err != nil {
+		SendError(w, http.StatusNotFound, "Pengguna tidak ditemukan")
+		return
+	}
+	hPass := storage.HashPassword(req.Passphrase)
+	if err := h.store.UpdateUserPassphrase(user.Username, hPass); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal menyimpan passphrase: "+err.Error())
+		return
+	}
+	_ = h.store.RecordActivity("AUTH", "INFO", user.Username, "SET_PASSPHRASE_SUCCESS", "Passphrase penandatanganan berhasil disetel", r.RemoteAddr, r.UserAgent())
+	SendSuccess(w, map[string]interface{}{"success": true, "has_passphrase": true}, "Passphrase penandatanganan TTE berhasil diaktifkan")
+}
+
+func (h *APIHandler) HandleVerifyPassphrase(w http.ResponseWriter, r *http.Request) {
+	var req PassphraseReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" || strings.TrimSpace(req.Passphrase) == "" {
+		SendError(w, http.StatusBadRequest, "Nama pengguna dan passphrase wajib diisi")
+		return
+	}
+	user, err := h.store.GetUserByUsername(strings.TrimSpace(req.Username))
+	if err != nil {
+		SendError(w, http.StatusNotFound, "Pengguna tidak ditemukan")
+		return
+	}
+	if user.SigningPassphraseHash == "" {
+		SendError(w, http.StatusBadRequest, "Passphrase penandatanganan belum disetel untuk akun ini")
+		return
+	}
+	if user.SigningPassphraseHash != storage.HashPassword(req.Passphrase) {
+		_ = h.store.RecordActivity("SECURITY", "WARN", user.Username, "VERIFY_PASSPHRASE_FAILED", "Otorisasi penandatanganan gagal: passphrase salah", r.RemoteAddr, r.UserAgent())
+		SendError(w, http.StatusUnauthorized, "Passphrase penandatanganan salah")
+		return
+	}
+	SendSuccess(w, map[string]interface{}{"valid": true}, "Passphrase penandatanganan valid")
+}
+
 type TraceSignReq struct {
 	Algorithm  string `json:"algorithm"`
 	PrivateKey string `json:"private_key"`
@@ -660,6 +716,7 @@ func (h *APIHandler) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.PasswordHash = ""
+	user.SigningPassphraseHash = ""
 	SendSuccess(w, user, "Berhasil masuk ke layanan")
 }
 
@@ -757,6 +814,7 @@ type PAdESSignRequest struct {
 	SignerMLDSAPrivKey string `json:"signer_mldsa_privkey"`
 	SignerMLDSAPubKey  string `json:"signer_mldsa_pubkey"`
 	Username           string `json:"username"`
+	Passphrase         string `json:"passphrase"`
 }
 
 type PAdESSignResponse struct {
@@ -801,10 +859,19 @@ func (h *APIHandler) HandlePAdESSign(w http.ResponseWriter, r *http.Request) {
 		req.MLDSAPublicKey = req.SignerMLDSAPubKey
 	}
 
-	// 2. Jika kunci privat kosong, cari dari basis data berdasarkan username
-	if req.MLDSAPrivateKey == "" && req.Username != "" {
+	// 2. Validasi passphrase dan ambil data akun jika ada username
+	if req.Username != "" {
 		if u, err := h.store.GetUserByUsername(req.Username); err == nil {
-			req.MLDSAPrivateKey = u.MldsaPrivateKey
+			if u.SigningPassphraseHash != "" {
+				if req.Passphrase == "" || u.SigningPassphraseHash != storage.HashPassword(req.Passphrase) {
+					_ = h.store.RecordActivity("SECURITY", "WARN", req.Username, "SIGN_PASSPHRASE_REJECTED", "Penandatanganan dibatalkan: passphrase tidak valid", r.RemoteAddr, r.UserAgent())
+					SendError(w, http.StatusUnauthorized, "Otorisasi gagal: Passphrase penandatanganan tidak valid")
+					return
+				}
+			}
+			if req.MLDSAPrivateKey == "" {
+				req.MLDSAPrivateKey = u.MldsaPrivateKey
+			}
 			if req.MLDSAPublicKey == "" {
 				req.MLDSAPublicKey = u.MldsaPublicKey
 			}
