@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ARSign — Platform TTE Pascakuantum (NIST FIPS 204)</title>
+  <title>ARSign — Platform Tanda Tangan Elektronik Sah & Tersertifikasi</title>
   <link rel="icon" type="image/svg+xml" href="/assets/logo-dark-box.svg">
 
   <!-- Prevent Theme Flash -->
@@ -115,10 +115,10 @@
             <img src="/assets/logo-navy.svg" class="w-full h-full object-contain block dark:hidden" alt="ARSign Logo">
             <img src="/assets/logo-white.svg" class="w-full h-full object-contain hidden dark:block" alt="ARSign Logo">
           </div>
-          <h1 class="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">ARSign Quantum Signature</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Platform TTE Pascakuantum NIST FIPS 204 ML-DSA</p>
+          <h1 class="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">ARSign Digital Signature</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Platform Layanan Tanda Tangan Elektronik Sah & Tersertifikasi</p>
           <div class="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-            Sertifikasi & Kriptografi Standar NIST FIPS 204
+            Tersertifikasi & Berstandar Keamanan Tertinggi
           </div>
         </div>
 
@@ -214,7 +214,7 @@
           <button type="submit" :disabled="registerForm.loading"
                   class="w-full mt-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
             <span v-if="registerForm.loading" class="animate-spin text-sm">⏳</span>
-            <span>{{ registerForm.loading ? 'Menghasilkan Kunci Pascakuantum...' : 'Daftar & Buat Pasangan Kunci ML-DSA' }}</span>
+            <span>{{ registerForm.loading ? 'Menerbitkan Sertifikat Digital...' : 'Daftar & Terbitkan Sertifikat TTE' }}</span>
           </button>
         </form>
       </div>
@@ -237,7 +237,7 @@
             </div>
             <div>
               <span class="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white">ARSign</span>
-              <span class="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">PQC FIPS 204</span>
+              <span class="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">Tersertifikasi Sah</span>
             </div>
           </div>
 
@@ -325,7 +325,7 @@
                   <h2 class="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span>✍️</span> <span>Penandatanganan Dokumen</span>
                   </h2>
-                  <p class="text-[11px] text-slate-500 dark:text-slate-400">Pembubuhan TTE Pascakuantum ML-DSA (NIST FIPS 204)</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">Pembubuhan Tanda Tangan Elektronik Bersertifikat</p>
                 </div>
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
                   Ready
@@ -368,29 +368,10 @@
                 </div>
               </div>
 
-              <!-- 3. Algoritma Kriptografi -->
-              <div>
-                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">3. Algoritma Kriptografis</label>
-                <div class="grid grid-cols-2 gap-2">
-                  <button type="button" @click="enableDualSign = false"
-                          class="p-2 rounded-xl border text-left transition"
-                          :class="!enableDualSign ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold' : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'">
-                    <div class="text-xs">ML-DSA-65</div>
-                    <div class="text-[9px] text-slate-500 font-normal">NIST FIPS 204 (Standar PQC)</div>
-                  </button>
-                  <button type="button" @click="enableDualSign = true"
-                          class="p-2 rounded-xl border text-left transition"
-                          :class="enableDualSign ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold' : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'">
-                    <div class="text-xs">Dual-Sign</div>
-                    <div class="text-[9px] text-slate-500 font-normal">ML-DSA + RSA (Transisi)</div>
-                  </button>
-                </div>
-              </div>
-
-              <!-- 4. Spesimen Visual Tanda Tangan -->
+              <!-- 3. Spesimen Visual Tanda Tangan -->
               <div>
                 <div class="flex items-center justify-between mb-1">
-                  <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300">4. Spesimen Tanda Tangan</label>
+                  <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300">3. Spesimen Tanda Tangan</label>
                   <button type="button" @click="openSpecimenModal" class="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold">
                     {{ specimenImage ? 'Ubah / Buat Baru' : '+ Buat Spesimen' }}
                   </button>
@@ -436,7 +417,7 @@
               <button type="button" @click="signDocument" :disabled="isSigning"
                       class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 transition flex items-center justify-center gap-2">
                 <span v-if="isSigning" class="animate-spin text-sm">⏳</span>
-                <span>{{ isSigning ? 'Memproses Penandatanganan Pascakuantum...' : 'Tanda Tangani Dokumen Pascakuantum (ML-DSA)' }}</span>
+                <span>{{ isSigning ? 'Memproses Penandatanganan...' : 'Tanda Tangani Dokumen Sekarang' }}</span>
               </button>
 
               <!-- Result Notice Card if available -->
@@ -589,7 +570,7 @@
 
               <div v-else-if="verifyStatus.isValid" class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 space-y-3">
                 <div class="flex items-center gap-2 font-extrabold text-sm text-emerald-700 dark:text-emerald-400">
-                  <span class="text-lg">✓</span> <span>TTE PASCAKUANTUM TERVERIFIKASI SAH</span>
+                  <span class="text-lg">✓</span> <span>TTE RESMI TERVERIFIKASI SAH</span>
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                   <div>
@@ -597,8 +578,8 @@
                     <strong class="text-slate-900 dark:text-white">{{ verifyStatus.signer }}</strong>
                   </div>
                   <div>
-                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Algoritma</span>
-                    <strong class="text-slate-900 dark:text-white">{{ verifyStatus.algorithm }}</strong>
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Status Keabsahan</span>
+                    <strong class="text-emerald-600 dark:text-emerald-400">Tersertifikasi Sah</strong>
                   </div>
                   <div>
                     <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Waktu Penandatanganan</span>
@@ -625,7 +606,7 @@
               <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
                 <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300">Standar Verifikasi:</div>
                 <ul class="text-[10px] text-slate-500 dark:text-slate-400 space-y-1 list-disc list-inside">
-                  <li>Validasi matematis NIST FIPS 204 (Module-Lattice-Based Digital Signature Algorithm).</li>
+                  <li>Validasi matematis integritas digital & tanda tangan bersertifikat.</li>
                   <li>Integritas hash dokumen dengan SHA-512 & SHA-256 (Pola ECS Anti-Tamper).</li>
                   <li>Pemeriksaan Certificate Revocation List (CRL) ARSign Sub-CA secara real-time.</li>
                 </ul>
@@ -676,7 +657,7 @@
                   <th class="py-2.5 px-3 font-semibold">ID Registrasi</th>
                   <th class="py-2.5 px-3 font-semibold">Judul Dokumen</th>
                   <th class="py-2.5 px-3 font-semibold">Waktu Penandatanganan</th>
-                  <th class="py-2.5 px-3 font-semibold">Algoritma</th>
+                  <th class="py-2.5 px-3 font-semibold">Tipe Sertifikat</th>
                   <th class="py-2.5 px-3 font-semibold text-center">Status</th>
                   <th class="py-2.5 px-3 font-semibold text-right">Aksi</th>
                 </tr>
@@ -692,7 +673,7 @@
                   <td class="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100 max-w-xs truncate">{{ item.title }}</td>
                   <td class="py-2.5 px-3 text-slate-500 text-[11px]">{{ item.time_str || item.time }}</td>
                   <td class="py-2.5 px-3 font-mono text-[10px]">
-                    <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">{{ item.algorithm }}</span>
+                    <span class="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold">TTE Bersertifikat</span>
                   </td>
                   <td class="py-2.5 px-3 text-center">
                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
@@ -786,7 +767,7 @@
                            class="w-full px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs">
                   </div>
                 </div>
-                <p class="text-[10px] text-slate-500">Kunci privat ML-DSA dienkripsi otomatis di dalam Vault menggunakan AES-256-GCM berbasis kata sandi Anda.</p>
+                <p class="text-[10px] text-slate-500">Kunci privat tanda tangan dienkripsi otomatis di dalam Vault menggunakan AES-256-GCM berbasis kata sandi Anda.</p>
               </div>
             </div>
 
@@ -826,27 +807,27 @@
             </button>
           </div>
 
-          <!-- CARD 4: KUNCI ML-DSA & SERTIFIKAT -->
+          <!-- CARD 4: SERTIFIKAT DIGITAL -->
           <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 mb-3">
                 <h3 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <span>🔑</span> <span>Kunci Pascakuantum & Rantai CA</span>
+                  <span>🔑</span> <span>Sertifikat Digital & Rantai CA</span>
                 </h3>
-                <span class="text-[10px] font-mono text-slate-500">FIPS 204 Ready</span>
+                <span class="text-[10px] font-mono text-slate-500">Vault Terproteksi</span>
               </div>
 
               <div class="space-y-2 text-xs">
                 <div>
-                  <span class="text-[10px] text-slate-500 block">Kunci Publik ML-DSA-65 (Hex)</span>
+                  <span class="text-[10px] text-slate-500 block">Identifikasi Sertifikat Publik (Fingerprint)</span>
                   <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-[9px] text-slate-600 dark:text-slate-400 truncate flex items-center justify-between">
-                    <span class="truncate">{{ currentUser.mldsa_public_key || 'ML-DSA Key' }}</span>
+                    <span class="truncate">{{ currentUser.mldsa_public_key || 'Kunci Publik' }}</span>
                     <button type="button" @click="copyToClipboard(currentUser.mldsa_public_key)" class="ml-2 font-bold text-blue-600 dark:text-blue-400 hover:underline">Salin</button>
                   </div>
                 </div>
                 <div class="text-[11px] text-slate-500 space-y-0.5">
                   <div>Status Vault: <strong class="text-emerald-600 dark:text-emerald-400">Aktif & Terenkripsi</strong></div>
-                  <div>Otoritas Penerbit: <strong>ARSign Sub-CA (Pascakuantum Ready)</strong></div>
+                  <div>Otoritas Penerbit: <strong>ARSign Sub-CA Terakreditasi</strong></div>
                 </div>
               </div>
             </div>
@@ -914,7 +895,7 @@
           <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
             <div><span class="text-slate-500">Judul Berkas:</span> <strong class="text-slate-900 dark:text-white">{{ selectedDetailItem.title }}</strong></div>
             <div><span class="text-slate-500">Penanda Tangan:</span> <strong class="text-slate-900 dark:text-white">{{ selectedDetailItem.signer }}</strong></div>
-            <div><span class="text-slate-500">Algoritma:</span> <span class="font-mono text-blue-600 dark:text-blue-400">{{ selectedDetailItem.algorithm }}</span></div>
+            <div><span class="text-slate-500">Tipe Sertifikat:</span> <span class="font-mono text-blue-600 dark:text-blue-400">TTE Sah & Bersertifikat</span></div>
             <div><span class="text-slate-500">Waktu TTE:</span> {{ selectedDetailItem.time_str || selectedDetailItem.time }}</div>
           </div>
 
@@ -926,7 +907,7 @@
           </div>
 
           <div v-if="selectedDetailItem.signature_hex">
-            <span class="text-[11px] text-slate-500 block mb-0.5">Signature Hex ML-DSA-65 (NIST FIPS 204)</span>
+            <span class="text-[11px] text-slate-500 block mb-0.5">Kode Segel Digital / Signature Hex</span>
             <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-[9px] break-all max-h-24 overflow-y-auto text-slate-600 dark:text-slate-400">
               {{ selectedDetailItem.signature_hex }}
             </div>

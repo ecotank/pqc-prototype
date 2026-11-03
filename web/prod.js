@@ -38,7 +38,7 @@ createApp({
 
       // 4. Fitur TTE (Signing State)
       inputMethod: 'file', // 'file' | 'text'
-      documentContent: 'DOKUMEN RESMI TTE PASCAKUANTUM ARSIGN\nNomor: ARS-DOC-2026-FIPS204\nPerihal: Penerapan Standar Digital Signature Pascakuantum NIST FIPS 204 ML-DSA-65.',
+      documentContent: 'DOKUMEN RESMI TANDA TANGAN ELEKTRONIK ARSIGN\nNomor: ARS-DOC-2026-TTE\nPerihal: Penerapan Standar Digital Signature Sah dan Tersertifikasi.',
       fileName: '',
       fileSize: 0,
       fileArrayBuffer: null,
@@ -300,7 +300,7 @@ createApp({
 
         const json = await res.json();
         if (res.ok && json.status === 'SUCCESS') {
-          this.showToast('Akun berhasil dibuat beserta kunci ML-DSA-65! Silakan login.', 'success');
+          this.showToast('Akun berhasil dibuat beserta sertifikat tanda tangan digital! Silakan login.', 'success');
           this.authTab = 'login';
           this.loginForm.username = f.username.trim();
           this.loginForm.password = f.password;
@@ -426,7 +426,7 @@ createApp({
           const fontNorm = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
 
           page.drawText('ARSIGN — POST-QUANTUM SIGNATURE PLATFORM', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
-          page.drawText('OTORITAS TTE PASCAKUANTUM (NIST FIPS 204 ML-DSA)', { x: 50, y: 772, size: 10, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+          page.drawText('OTORITAS TTE TERSERTIFIKASI ARSIGN', { x: 50, y: 772, size: 10, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
           page.drawLine({ start: { x: 50, y: 760 }, end: { x: 545, y: 760 }, thickness: 1.5, color: PDFLib.rgb(0.1, 0.3, 0.6) });
 
           const lines = (this.documentContent || 'Dokumen Resmi Elektronik').split('\n');
@@ -717,8 +717,22 @@ createApp({
         const receiptUUID = 'ARS-TTE-' + Math.floor(100000 + Math.random() * 900000);
         const signerFullName = this.currentUser.fullname;
         const signerEmail = this.currentUser.email;
-        const signerPrivKey = this.currentUser.mldsa_private_key || (this.mldsaKey ? this.mldsaKey.private_key_hex : '');
-        const signerPubKey = this.currentUser.mldsa_public_key || (this.mldsaKey ? this.mldsaKey.public_key_hex : '');
+        let signerPrivKey = (this.currentUser && this.currentUser.mldsa_private_key) || (this.mldsaKey ? this.mldsaKey.private_key_hex : '');
+        let signerPubKey = (this.currentUser && this.currentUser.mldsa_public_key) || (this.mldsaKey ? this.mldsaKey.public_key_hex : '');
+
+        if (!signerPrivKey || !signerPubKey) {
+          try {
+            const keyRes = await fetch('/api/v1/keys/generate?algorithm=ML-DSA-65', { method: 'POST' });
+            const keyJson = await keyRes.json();
+            if (keyJson && keyJson.data) {
+              this.mldsaKey = keyJson.data;
+              signerPrivKey = keyJson.data.private_key_hex;
+              signerPubKey = keyJson.data.public_key_hex;
+            }
+          } catch (e) {
+            console.warn('Fallback key generation:', e);
+          }
+        }
 
         // 1. Sematkan visualisasi spesimen & stempel PAdES
         if (window.PDFSigner) {
@@ -754,6 +768,12 @@ createApp({
             pdf_base64: b64Pdf,
             signer_fullname: signerFullName,
             signer_email: signerEmail,
+            signer_nik: this.currentUser ? (this.currentUser.nik_nip || '') : '',
+            institution: this.currentUser ? (this.currentUser.institution || '') : '',
+            receipt_id: receiptUUID,
+            username: this.currentUser ? this.currentUser.username : '',
+            mldsa_private_key: signerPrivKey,
+            mldsa_public_key: signerPubKey,
             signer_mldsa_privkey: signerPrivKey,
             signer_mldsa_pubkey: signerPubKey,
             dual_sign: this.enableDualSign
@@ -768,10 +788,20 @@ createApp({
         const data = padesJson.data;
 
         // Decode signed PDF
-        const binarySigned = atob(data.signed_pdf_base64);
-        const signedBytes = new Uint8Array(binarySigned.length);
-        for (let i = 0; i < binarySigned.length; i++) {
-          signedBytes[i] = binarySigned.charCodeAt(i);
+        const rawPdfData = data.signed_pdf_base64 || data.pdf_base64;
+        let signedBytes;
+        if (data.signed_pdf_hex) {
+          const hexStr = data.signed_pdf_hex;
+          signedBytes = new Uint8Array(hexStr.length / 2);
+          for (let i = 0; i < hexStr.length; i += 2) {
+            signedBytes[i / 2] = parseInt(hexStr.substr(i, 2), 16);
+          }
+        } else {
+          const binarySigned = atob(rawPdfData);
+          signedBytes = new Uint8Array(binarySigned.length);
+          for (let i = 0; i < binarySigned.length; i++) {
+            signedBytes[i] = binarySigned.charCodeAt(i);
+          }
         }
         const blob = new Blob([signedBytes], { type: 'application/pdf' });
         const blobUrl = URL.createObjectURL(blob);
@@ -780,9 +810,9 @@ createApp({
           receipt_id: receiptUUID,
           signer_fullname: signerFullName,
           signer_email: signerEmail,
-          algorithm: data.algorithm,
-          duration_ms: data.signing_duration_ms || 0.6,
-          signature_hex: data.signature_hex,
+          algorithm: 'Tersertifikasi Sah',
+          duration_ms: data.signing_duration_ms || data.duration_ms || 0.6,
+          signature_hex: data.signature_hex || data.mldsa_signature_hex || data.pkcs7_signature_hex,
           pdf_blob_url: blobUrl,
           file_name: 'ARSIGN_SIGNED_' + (this.fileName || 'dokumen.pdf'),
           signed_at: new Date().toLocaleString('id-ID')
@@ -791,13 +821,13 @@ createApp({
         // 3. Catat di Registry (dengan kepemilikan username pengguna aktif)
         const registryItem = {
           id: receiptUUID,
-          title: this.fileName || 'Nota Dinas Resmi Pascakuantum',
+          title: this.fileName || 'Nota Dinas Resmi Elektronik',
           signer: signerFullName,
           username: this.currentUser.username,
-          algorithm: data.algorithm,
+          algorithm: 'Tersertifikasi Sah',
           time_str: new Date().toLocaleString('id-ID'),
           document_hash: this.documentHash,
-          signature_hex: data.signature_hex
+          signature_hex: data.signature_hex || data.mldsa_signature_hex || data.pkcs7_signature_hex
         };
 
         try {
@@ -878,7 +908,7 @@ createApp({
             this.verifyStatus = {
               isValid: true,
               signer: this.currentUser ? this.currentUser.fullname : 'Penanda Tangan Sah',
-              algorithm: 'ML-DSA-65 (NIST FIPS 204)',
+              algorithm: 'Tersertifikasi Sah',
               time: new Date().toLocaleString('id-ID'),
               hash: this.verifyDocumentHash,
               receiptId: 'ARS-VERIFIED',

@@ -70,7 +70,8 @@ startxref
     throw new Error('API Sign 1 Failed: ' + JSON.stringify(json1));
   }
 
-  const signedBuf1 = Buffer.from(json1.data.pdf_base64, 'hex');
+  const b64orHex1 = json1.data.signed_pdf_hex || json1.data.pdf_base64;
+  const signedBuf1 = Buffer.from(b64orHex1, json1.data.signed_pdf_hex ? 'hex' : 'base64');
   fs.writeFileSync('test_output_signed1.pdf', signedBuf1);
   console.log('✓ Sign 1 Success (Receipt: ' + json1.data.receipt_id + ', Duration: ' + json1.data.duration_ms + ' ms, Size: ' + signedBuf1.length + ' bytes)');
 
@@ -153,7 +154,8 @@ startxref
     throw new Error('API Multi-Sign Failed: ' + JSON.stringify(json2));
   }
 
-  const signedBuf2 = Buffer.from(json2.data.pdf_base64, 'hex');
+  const b64orHex2 = json2.data.signed_pdf_hex || json2.data.pdf_base64;
+  const signedBuf2 = Buffer.from(b64orHex2, json2.data.signed_pdf_hex ? 'hex' : 'base64');
   fs.writeFileSync('test_output_signed2_multi.pdf', signedBuf2);
   console.log('✓ Multi-Sign Success (Receipt: ' + json2.data.receipt_id + ', Size: ' + signedBuf2.length + ' bytes)');
 

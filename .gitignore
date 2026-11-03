@@ -30,3 +30,7 @@ Thumbs.db
 *.key
 crypto/ca_keys/
 test_functional_*
+test_output_*
+test_input_*
+*.bin
+*.p7s
