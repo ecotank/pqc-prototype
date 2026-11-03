@@ -1,5 +1,5 @@
 /**
- * Modul Pemrosesan Visual PDF & Penyematan Spesimen Tanda Tangan BSrE
+ * Modul Pemrosesan Visual PDF & Penyematan Spesimen Tanda Tangan ARSign
  * Bertanggung jawab menyatukan dokumen, gambar spesimen pengguna, QR code, dan stempel TTE.
  */
 window.PDFSigner = (function() {
@@ -10,7 +10,7 @@ window.PDFSigner = (function() {
    * @param {string} opts.textContent - Isi teks jika masukan berupa teks surat
    * @param {string|null} opts.specimenDataUrl - Data URL gambar spesimen tanda tangan
    * @param {string} opts.position - 'bottom-right' | 'bottom-left' | 'center'
-   * @param {string} opts.receiptId - Nomor registrasi TTE BSrE
+   * @param {string} opts.receiptId - Nomor registrasi TTE ARSign
    * @param {string} opts.signerName - Nama lengkap penanda tangan
    * @returns {Promise<{ pdfBytes: Uint8Array, sha256Hex: string }>}
    */
@@ -26,8 +26,8 @@ window.PDFSigner = (function() {
       const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
       const fontNorm = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-      page.drawText('BADAN SIBER DAN SANDI NEGARA', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
-      page.drawText('BALAI BESAR SERTIFIKASI ELEKTRONIK (BSrE)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+      page.drawText('ARSIGN POST-QUANTUM SIGNATURE', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
+      page.drawText('PLATFORM TTE REKAYASA PERANGKAT LUNAK KRIPTO (3 RPLK)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
       page.drawLine({
         start: { x: 50, y: 760 },
         end: { x: 545, y: 760 },
@@ -53,8 +53,8 @@ window.PDFSigner = (function() {
     }
     const { width, height } = targetPage.getSize();
 
-    // 1. Buat QR Code Verifikasi Berbasis URL Resmi BSrE
-    const qrDataUrl = await QRCode.toDataURL(`https://bsre.bssn.go.id/verify/${opts.receiptId}`, {
+    // 1. Buat QR Code Verifikasi Berbasis URL Resmi ARSign
+    const qrDataUrl = await QRCode.toDataURL(`https://smallcircle.web.id/verify/${opts.receiptId}`, {
       width: 140,
       margin: 1,
       color: { dark: '#002952', light: '#FFFFFF' }
@@ -110,7 +110,7 @@ window.PDFSigner = (function() {
     const fontHeader = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
     const fontBody = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-    // 5. Gambar Box Bingkai Resmi BSrE
+    // 5. Gambar Box Bingkai Resmi ARSign
     targetPage.drawRectangle({
       x: posX,
       y: posY,
@@ -155,7 +155,7 @@ window.PDFSigner = (function() {
         height: specH
       });
     } else {
-      // Banner Segel Resmi BSrE BSSN RI jika gambar spesimen pribadi tidak diunggah
+      // Banner Segel Resmi ARSign Trust Network jika gambar spesimen pribadi tidak diunggah
       targetPage.drawRectangle({
         x: contentX,
         y: specY,
@@ -168,7 +168,7 @@ window.PDFSigner = (function() {
       const bannerTitleSize = Math.max(5, Math.min(8, specH * 0.36));
       const bannerSubSize = Math.max(4, Math.min(6.5, specH * 0.28));
 
-      targetPage.drawText('SEGEL ELEKTRONIK RESMI BSrE', {
+      targetPage.drawText('SEGEL DIGITAL RESMI ARSIGN', {
         x: contentX + 4,
         y: specY + (specH / 2) + 1,
         size: bannerTitleSize,
@@ -176,7 +176,7 @@ window.PDFSigner = (function() {
         color: PDFLib.rgb(1, 1, 1)
       });
 
-      targetPage.drawText('BADAN SIBER DAN SANDI NEGARA', {
+      targetPage.drawText('ARSIGN POST-QUANTUM SIGNATURE', {
         x: contentX + 4,
         y: specY + (specH / 2) - bannerSubSize - 1,
         size: bannerSubSize,
@@ -221,11 +221,11 @@ window.PDFSigner = (function() {
       SubFilter: 'adbe.pkcs7.detached',
       ByteRange: byteRangePlaceholder,
       Contents: PDFLib.PDFHexString.of(placeholderHex),
-      Reason: PDFLib.PDFString.of('TTE Pascakuantum Sah BSrE BSSN RI - FIPS 204 ML-DSA-65'),
+      Reason: PDFLib.PDFString.of('TTE Pascakuantum Sah ARSign - FIPS 204 ML-DSA-65'),
       M: PDFLib.PDFString.of('D:' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + "+07'00'"),
-      Name: PDFLib.PDFString.of(opts.signerName || 'Pejabat Penandatangan BSrE'),
+      Name: PDFLib.PDFString.of(opts.signerName || 'Penanda Tangan ARSign'),
       Location: PDFLib.PDFString.of('Jakarta, Indonesia'),
-      ContactInfo: PDFLib.PDFString.of('info@bsre.bssn.go.id')
+      ContactInfo: PDFLib.PDFString.of('no-reply@smallcircle.web.id')
     });
     const sigRef = pdfDoc.context.register(sigDict);
 
@@ -236,7 +236,7 @@ window.PDFSigner = (function() {
       FT: 'Sig',
       Rect: [posX, posY, posX + boxW, posY + boxH],
       V: sigRef,
-      T: PDFLib.PDFString.of('BSRE_SIG_' + opts.receiptId),
+      T: PDFLib.PDFString.of('ARS_SIG_' + opts.receiptId),
       F: 4,
       P: targetPage.ref
     });

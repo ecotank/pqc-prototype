@@ -24,7 +24,7 @@ stream
 BT
 /F1 12 Tf
 72 712 Td
-(Dokumen Resmi Uji PQC BSrE BSSN) Tj
+(Dokumen Resmi Uji PQC ARSign) Tj
 ET
 endstream
 endobj
@@ -56,10 +56,10 @@ startxref
     body: JSON.stringify({
       pdf_base64: cleanBuf.toString('base64'),
       signer_fullname: 'Satria Alba Pramasha, S.Tr.Kom.',
-      signer_email: 'satria.alba@bsre.bssn.go.id',
+      signer_email: 'alba@smallcircle.web.id',
       signer_nik: '199910262024011001',
-      institution: 'Balai Besar Sertifikasi Elektronik - BSSN',
-      receipt_id: 'BSRE-TEST-SIGN1',
+      institution: 'ARSign Trust Network (3 RPLK)',
+      receipt_id: 'ARS-TEST-SIGN1',
       mldsa_private_key: mldsaPriv,
       mldsa_public_key: mldsaPub
     })
@@ -115,8 +115,8 @@ startxref
   // Check embedded certificates in PKCS#7
   const certsText = execSync('openssl pkcs7 -in test_pkcs7_sig1.p7s -inform DER -print_certs -text', { encoding: 'utf-8' });
   const hasSigner = certsText.includes('Satria Alba Pramasha');
-  const hasSubCA = certsText.includes('BSrE Sub-CA Pelayanan TTE Pascakuantum');
-  const hasRootCA = certsText.includes('BSrE BSSN Root CA');
+  const hasSubCA = certsText.includes('ARSign Sub-CA Pelayanan TTE Pascakuantum');
+  const hasRootCA = certsText.includes('ARSign Root CA');
   console.log(`  Contains Signer Cert : ${hasSigner}`);
   console.log(`  Contains Sub-CA Cert : ${hasSubCA}`);
   console.log(`  Contains Root CA Cert: ${hasRootCA}`);
@@ -127,7 +127,7 @@ startxref
 
   // Verify PKCS#7 against Root CA
   fs.writeFileSync('test_digest_bytes.bin', combined);
-  const verifyOut = execSync('openssl smime -verify -in test_pkcs7_sig1.p7s -inform DER -content test_digest_bytes.bin -CAfile BSRE_Root_and_SubCA.pem -noverify', { encoding: 'utf-8' });
+  const verifyOut = execSync('openssl smime -verify -in test_pkcs7_sig1.p7s -inform DER -content test_digest_bytes.bin -CAfile ARSIGN_Root_and_SubCA.pem -noverify', { encoding: 'utf-8' });
   console.log('  OpenSSL verification output: ' + verifyOut.trim());
   console.log('  ✓ OpenSSL PKCS#7 cryptographic signature VALID!');
 
@@ -138,11 +138,11 @@ startxref
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       pdf_base64: signedBuf1.toString('base64'),
-      signer_fullname: 'Pejabat Verifikator Kedua BSrE',
-      signer_email: 'verifikator@bsre.bssn.go.id',
+      signer_fullname: 'Raditya, S.Kom.',
+      signer_email: 'radit@smallcircle.web.id',
       signer_nik: '198501012010011002',
-      institution: 'Badan Siber dan Sandi Negara',
-      receipt_id: 'BSRE-TEST-SIGN2-MULTI',
+      institution: 'ARSign Trust Network (3 RPLK)',
+      receipt_id: 'ARS-TEST-SIGN2-MULTI',
       mldsa_private_key: mldsaPriv,
       mldsa_public_key: mldsaPub
     })

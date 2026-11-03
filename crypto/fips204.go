@@ -65,7 +65,7 @@ func RunFIPS204Validation() *FIPSValidationReport {
 		})
 
 		// Test 2: Signature Generation & Size
-		msg := []byte("BSrE-BSSN FIPS 204 Test Vector Message Payload")
+		msg := []byte("ARSign FIPS 204 Test Vector Message Payload")
 		t0 = time.Now()
 		sig := scheme.Sign(sk, msg, nil)
 		dur2 := float64(time.Since(t0).Microseconds()) / 1000.0

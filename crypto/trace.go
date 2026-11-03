@@ -60,10 +60,10 @@ func TraceSignMLDSA(alg string, privKeyBytes []byte, payload []byte) (*TraceSign
 	d1 := float64(time.Since(t0).Microseconds())
 	steps = append(steps, ProcessStep{
 		StepNumber:       1,
-		Name:             "Pre-Hash & Integrasi ECS (Pola Pre-Hash)",
+		Name:             "Pre-Hash & Integrasi Client Service (Pola Pre-Hash)",
 		Phase:            "Input Processing",
 		Formula:          "μ = H(M) = SHA-256(Payload)",
-		Description:      "Sesuai pola ECS BSrE, pesan di-hash secara deterministik sehingga dokumen asli tetap berada di jaringan instansi.",
+		Description:      "Sesuai pola arsitektur ARSign, pesan di-hash secara deterministik sehingga dokumen asli tetap berada di jaringan klien.",
 		Status:           "SUCCESS",
 		DurationMicrosec: d1,
 		Snapshots: map[string]string{

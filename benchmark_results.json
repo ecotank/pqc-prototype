@@ -1,0 +1,38 @@
+[
+  {
+    "alg": "RSA-2048 (PKCS#1 v1.5)",
+    "standard": "PKCS#1 / RFC 8017",
+    "secLevel": "112-bit Classical",
+    "quantumSafe": "TIDAK (Rentan Shor)",
+    "pubKeyBytes": 294,
+    "privKeyBytes": 1217,
+    "sigBytes": 256,
+    "keygenMs": "37.929",
+    "signMs": "0.736",
+    "verifyMs": "0.102"
+  },
+  {
+    "alg": "ECDSA P-256 (secp256r1)",
+    "standard": "FIPS 186-5 / SEC 2",
+    "secLevel": "128-bit Classical",
+    "quantumSafe": "TIDAK (Rentan Shor)",
+    "pubKeyBytes": 91,
+    "privKeyBytes": 138,
+    "sigBytes": 72,
+    "keygenMs": "0.204",
+    "signMs": "0.102",
+    "verifyMs": "0.102"
+  },
+  {
+    "alg": "ML-DSA-65 (Dilithium3)",
+    "standard": "NIST FIPS 204 (2024)",
+    "secLevel": "Kategori 3 (~AES-192)",
+    "quantumSafe": "YA (Kebal Komputer Kuantum)",
+    "pubKeyBytes": 1952,
+    "privKeyBytes": 4032,
+    "sigBytes": 3309,
+    "keygenMs": "6.187",
+    "signMs": "5.327",
+    "verifyMs": "0.751"
+  }
+]

@@ -31,10 +31,15 @@ func main() {
 		portProc = "8081"
 	}
 
+	portAdmin := os.Getenv("PORT_ADMIN")
+	if portAdmin == "" {
+		portAdmin = "8082"
+	}
+
 	// 1. Inisialisasi Database SQLite Lokal
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-		dbPath = "pqc_bsre.db"
+		dbPath = "pqc_arsign.db"
 	}
 	store, err := storage.InitStorage(dbPath)
 	if err != nil {
@@ -120,6 +125,19 @@ func main() {
 		staticHandler.ServeHTTP(w, r)
 	})
 
+	// 6. Mux Service Administrator & Audit Forensik (Port 8082)
+	muxAdmin := http.NewServeMux()
+	api.RegisterAdminRoutes(muxAdmin, handler)
+	muxAdmin.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		data, err := readWebFile("admin.html")
+		if err != nil {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(data)
+	})
+
 	serverProd := &http.Server{
 		Addr:         ":" + portProd,
 		Handler:      api.CORSMiddleware(muxProd),
@@ -134,22 +152,39 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 	}
 
+	serverAdmin := &http.Server{
+		Addr:         ":" + portAdmin,
+		Handler:      api.CORSMiddleware(muxAdmin),
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	_ = store.RecordActivity("SYSTEM", "INFO", "SYSTEM", "SERVER_STARTUP", fmt.Sprintf("Layanan ARSign TTE Pascakuantum aktif di Port %s (Prod), %s (Lab), %s (Admin Audit)", portProd, portProc, portAdmin), "127.0.0.1", "pqc-server")
+
 	fmt.Println("================================================================")
-	fmt.Println("   PURWARUPA PENANDATANGANAN DIGITAL POST-QUANTUM (ML-DSA)     ")
-	fmt.Println("   Balai Besar Sertifikasi Elektronik (BSrE) - BSSN RI          ")
+	fmt.Println("   ARSIGN — POST-QUANTUM DIGITAL SIGNATURE ENGINE (ML-DSA)     ")
+	fmt.Println("   Tim Pengembang 3 RPLK: Alba, Radit, Sulthan                  ")
 	fmt.Println("================================================================")
 	fmt.Printf("   Standar   : NIST FIPS 204 (ML-DSA-44, ML-DSA-65, ML-DSA-87)\n")
 	fmt.Printf("   Target TTE: =< 2.0 Detik (Aktual: Sub-Milidetik / < 1 ms)\n")
 	fmt.Printf("   Basis Data: SQLite (%s)\n", dbPath)
 	fmt.Println("----------------------------------------------------------------")
-	fmt.Printf("   [1] WEB SIAP PRODUKSI (Enterprise TTE): http://localhost:%s\n", portProd)
+	fmt.Printf("   [1] WEB SIAP PRODUKSI (ARSign Portal) : http://localhost:%s\n", portProd)
 	fmt.Printf("   [2] WEB VISUALISASI PROSES (Lab PQC)  : http://localhost:%s\n", portProc)
+	fmt.Printf("   [3] SERVICE AUDIT & LOG ADMIN (Port)  : http://localhost:%s\n", portAdmin)
 	fmt.Println("================================================================")
 
 	// Goroutine untuk listener Web Proses
 	go func() {
 		if err := serverProc.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Server Visualisasi Proses berhenti: %v", err)
+		}
+	}()
+
+	// Goroutine untuk listener Service Admin
+	go func() {
+		if err := serverAdmin.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("Service Administrator berhenti: %v", err)
 		}
 	}()
 
@@ -171,5 +206,6 @@ func main() {
 
 	_ = serverProd.Shutdown(ctx)
 	_ = serverProc.Shutdown(ctx)
+	_ = serverAdmin.Shutdown(ctx)
 	fmt.Println("[*] Seluruh layanan berhenti dengan bersih.")
 }

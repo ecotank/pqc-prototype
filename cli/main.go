@@ -41,8 +41,8 @@ func main() {
 
 func printUsage() {
 	fmt.Println("=====================================================================")
-	fmt.Println(" CLI PURWARUPA PENANDATANGANAN PASCALATTICE ML-DSA (BSrE - BSSN)")
-	fmt.Println(" Standar: NIST FIPS 204 | Target: Penandatanganan =< 2.0 Detik")
+	fmt.Println(" CLI PURWARUPA PENANDATANGANAN PASCALATTICE ML-DSA (ARSIGN - 3 RPLK)")
+	fmt.Println(" Standar: NIST FIPS 204 | Tim Pengembang: Alba, Radit, Sulthan")
 	fmt.Println("=====================================================================")
 	fmt.Println("Penggunaan: pqc-cli <perintah> [opsi]")
 	fmt.Println()
@@ -147,7 +147,7 @@ func runKeygen(args []string) {
 func runSign(args []string) {
 	fs := flag.NewFlagSet("sign", flag.ExitOnError)
 	alg := fs.String("alg", "ML-DSA-65", "Algoritma")
-	msg := fs.String("msg", "Surat Keputusan Elektronik BSrE 2026", "Pesan atau data yang ditandatangani")
+	msg := fs.String("msg", "Surat Keputusan Elektronik ARSign 2026", "Pesan atau data yang ditandatangani")
 	privKeyHex := fs.String("key", "", "Kunci privat dalam format Hex (jika kosong akan dibuat otomatis)")
 	_ = fs.Parse(args)
 
@@ -213,7 +213,7 @@ func runSign(args []string) {
 func runVerify(args []string) {
 	fs := flag.NewFlagSet("verify", flag.ExitOnError)
 	alg := fs.String("alg", "ML-DSA-65", "Algoritma")
-	msg := fs.String("msg", "Surat Keputusan Elektronik BSrE 2026", "Pesan atau data yang diverifikasi")
+	msg := fs.String("msg", "Surat Keputusan Elektronik ARSign 2026", "Pesan atau data yang diverifikasi")
 	pubHex := fs.String("pub", "", "Kunci publik dalam format Hex")
 	sigHex := fs.String("sig", "", "Tanda tangan dalam format Hex")
 	_ = fs.Parse(args)
@@ -258,7 +258,7 @@ func runVerify(args []string) {
 
 func runDualSign(args []string) {
 	fs := flag.NewFlagSet("dual-sign", flag.ExitOnError)
-	msg := fs.String("msg", "Dokumen Transisi Bersama BSrE - RSA + ML-DSA", "Pesan uji")
+	msg := fs.String("msg", "Dokumen Transisi Bersama ARSign - RSA + ML-DSA", "Pesan uji")
 	_ = fs.Parse(args)
 
 	fmt.Println("\n[*] Membangkitkan pasangan kunci uji (ML-DSA-65 & RSA-2048)...")

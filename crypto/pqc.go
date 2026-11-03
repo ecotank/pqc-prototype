@@ -1,6 +1,6 @@
 // Package crypto menyediakan primitif tanda tangan digital pascakuantum (Post-Quantum Cryptography)
 // berbasis Module-Lattice-Based Digital Signature Algorithm (ML-DSA) sesuai standar resmi NIST FIPS 204
-// serta algoritma pembanding klasik RSA (PKCS #1 v1.5) untuk kebutuhan purwarupa TTE BSrE BSSN.
+// serta algoritma pembanding klasik RSA (PKCS #1 v1.5) untuk kebutuhan platform TTE ARSign.
 package crypto
 
 import (
@@ -28,7 +28,7 @@ type AlgorithmParams struct {
 	PublicKeyBytes   int    `json:"public_key_bytes"`  // Ukuran kunci publik baku dalam byte
 	PrivateKeyBytes  int    `json:"private_key_bytes"` // Ukuran kunci privat baku dalam byte
 	SignatureBytes   int    `json:"signature_bytes"`   // Ukuran tanda tangan baku dalam byte
-	Description      string `json:"description"`       // Rekomendasi penggunaan pada ekosistem BSrE
+	Description      string `json:"description"`       // Rekomendasi penggunaan pada ekosistem ARSign
 }
 
 // MLDSASpecs memetakan parameter resmi FIPS 204 untuk seluruh varian parameter set.
@@ -55,7 +55,7 @@ var MLDSASpecs = map[string]AlgorithmParams{
 		PublicKeyBytes:   1952,
 		PrivateKeyBytes:  4032,
 		SignatureBytes:   3309,
-		Description:      "NIST Kategori 3 (Setara AES-192, Direkomendasikan BSrE untuk End-Entity)",
+		Description:      "NIST Kategori 3 (Setara AES-192, Direkomendasikan ARSign untuk End-Entity)",
 	},
 	"ML-DSA-87": {
 		Name:             "ML-DSA-87",

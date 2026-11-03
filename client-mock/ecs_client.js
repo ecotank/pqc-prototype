@@ -4,7 +4,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:8080/api/v1';
 
 async function main() {
   console.log('================================================================');
-  console.log(' SIMULASI ESIGN CLIENT SERVICE (ECS) BSrE - POLA PRE-HASH PQC');
+  console.log(' SIMULASI CLIENT SERVICE ARSIGN - POLA PRE-HASH PQC');
   console.log(' Menghubungi Layanan Penandatanganan ML-DSA (FIPS 204)');
   console.log('================================================================\n');
 

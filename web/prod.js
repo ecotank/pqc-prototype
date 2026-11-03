@@ -5,7 +5,7 @@ createApp({
     return {
       activeTab: 'dashboard',
       inputMethod: 'file',
-      documentContent: 'NOTA DINAS RESMI BADAN SIBER DAN SANDI NEGARA\nNomor: ND-812/BSSN/BSRE/PQC/10/2026\nPerihal: Penerapan Standar Digital Signature NIST FIPS 204 pada Layanan Sertifikasi Elektronik Nasional.',
+      documentContent: 'DOKUMEN RESMI TTE PASCAKUANTUM ARSIGN\nNomor: ARS-DOC-2026-3RPLK\nPerihal: Penerapan Standar Digital Signature NIST FIPS 204 ML-DSA-65 oleh Tim 3 RPLK (Alba, Radit, Sulthan).',
       fileName: '',
       fileSize: 0,
       fileArrayBuffer: null,
@@ -233,10 +233,10 @@ createApp({
         } else {
           this.registryList = [
             {
-              id: 'BSRE-TTE-747830',
-              title: 'Dokumen Spesimen Resmi TTE Pascakuantum BSrE BSSN',
-              signer: 'Satria Alba Pramasha, S.Tr.Kom.',
-              institution: 'Balai Besar Sertifikasi Elektronik (BSrE) BSSN RI',
+              id: 'ARS-TTE-747830',
+              title: 'Dokumen Spesimen Resmi TTE Pascakuantum ARSign',
+              signer: 'Satria Alba (Tim ARSign)',
+              institution: 'ARSign Trust Network (Kelas 3 RPLK)',
               algorithm: 'ML-DSA-65',
               document_hash: '3f6c8d197607a0c793ba28768a44b93b827e8dcf49c4f1c988a6d2f348e65306',
               time: '2026-10-28 09:30:15',
@@ -393,8 +393,8 @@ createApp({
           const fontBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
           const fontNorm = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-          page.drawText('BADAN SIBER DAN SANDI NEGARA', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
-          page.drawText('BALAI BESAR SERTIFIKASI ELEKTRONIK (BSrE)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+          page.drawText('ARSIGN — POST-QUANTUM SIGNATURE PLATFORM', { x: 50, y: 790, size: 14, font: fontBold, color: PDFLib.rgb(0.05, 0.15, 0.35) });
+          page.drawText('PROYEK TTE REKAYASA PERANGKAT LUNAK KRIPTO (3 RPLK)', { x: 50, y: 772, size: 11, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2) });
           page.drawLine({ start: { x: 50, y: 760 }, end: { x: 545, y: 760 }, thickness: 1.5, color: PDFLib.rgb(0.1, 0.3, 0.6) });
 
           const lines = (this.documentContent || 'Dokumen Resmi Elektronik').split('\n');
@@ -743,8 +743,8 @@ createApp({
       }
 
       // Validasi passphrase: cek passphrase sertifikat pengguna, kata sandi akun, atau fallback standar
-      const userPass = (this.currentUser && (this.currentUser.passphrase || this.currentUser.password)) ? (this.currentUser.passphrase || this.currentUser.password) : 'Bssn@2026';
-      if (this.passphraseInput !== userPass && this.passphraseInput !== (this.currentUser && this.currentUser.password) && this.passphraseInput !== 'Bssn@2026' && this.passphraseInput !== '123456') {
+      const userPass = (this.currentUser && (this.currentUser.passphrase || this.currentUser.password)) ? (this.currentUser.passphrase || this.currentUser.password) : 'Arsign@2026';
+      if (this.passphraseInput !== userPass && this.passphraseInput !== (this.currentUser && this.currentUser.password) && this.passphraseInput !== 'Arsign@2026' && this.passphraseInput !== '123456') {
         this.securityAuthError = 'Passphrase salah. Masukkan passphrase sertifikat yang Anda buat saat registrasi.';
         return;
       }
@@ -770,13 +770,13 @@ createApp({
           publicKey: {
             challenge: challenge,
             rp: {
-              name: 'BSrE BSSN RI - TTE Pascakuantum',
+              name: 'ARSign Platform - TTE Pascakuantum (3 RPLK)',
               id: window.location.hostname
             },
             user: {
-              id: new TextEncoder().encode(this.currentUser.username || 'user-bsre'),
-              name: this.currentUser.email || 'satria.alba@bsre.bssn.go.id',
-              displayName: this.currentUser.fullname || 'Satria Alba Pramasha'
+              id: new TextEncoder().encode(this.currentUser.username || 'user-arsign'),
+              name: this.currentUser.email || 'alba@smallcircle.web.id',
+              displayName: this.currentUser.fullname || 'Satria Alba (Tim ARSign)'
             },
             pubKeyCredParams: [
               { type: 'public-key', alg: -7 },  // ES256
@@ -812,9 +812,9 @@ createApp({
 
       try {
         let pdfBytesFinal = null;
-        const receiptUUID = 'BSRE-TTE-' + Math.floor(100000 + Math.random() * 900000);
+        const receiptUUID = 'ARS-TTE-' + Math.floor(100000 + Math.random() * 900000);
         const signerFullName = this.currentUser.fullname || 'Satria Alba Pramasha, S.Tr.Kom.';
-        const signerEmail = this.currentUser.email || 'satria.alba@bsre.bssn.go.id';
+        const signerEmail = this.currentUser.email || 'alba@smallcircle.web.id';
         const signerPrivKey = (this.currentUser && this.currentUser.mldsa_private_key) ? this.currentUser.mldsa_private_key : (this.mldsaKey ? this.mldsaKey.private_key_hex : '');
         const signerPubKey = (this.currentUser && this.currentUser.mldsa_public_key) ? this.currentUser.mldsa_public_key : (this.mldsaKey ? this.mldsaKey.public_key_hex : '');
 
@@ -879,7 +879,7 @@ createApp({
                     signer_fullname: signerFullName,
                     signer_email: signerEmail,
                     signer_nik: this.currentUser ? this.currentUser.nik_nip : '199910262024011001',
-                    institution: this.currentUser ? this.currentUser.institution : 'Balai Besar Sertifikasi Elektronik - BSSN',
+                    institution: this.currentUser ? this.currentUser.institution : 'ARSign Trust Network (3 RPLK)',
                     receipt_id: receiptUUID,
                     mldsa_private_key: signerPrivKey,
                     mldsa_public_key: signerPubKey
@@ -975,7 +975,7 @@ createApp({
 
           // Inject authentic ASN.1 PKCS#7 container ke /Contents
           if (visualRes && visualRes.startContents && visualRes.endContents) {
-            const templateHex = window.BSRE_PADES_TEMPLATE_HEX || '';
+            const templateHex = window.ARSIGN_PADES_TEMPLATE_HEX || '';
             if (templateHex) {
               pdfBytesFinal = window.PDFSigner.injectPKCS7(pdfBytesFinal, templateHex, visualRes.startContents, visualRes.endContents);
             }
@@ -1006,14 +1006,14 @@ createApp({
         };
 
         // 3. Simpan ke Database SQLite Permanen via API (jika ada) dan simpan ke localStorage
-        const docTitle = this.inputMethod === 'file' ? ('Dokumen: ' + (this.fileName || 'Dokumen_Resmi.pdf')) : 'Nota Dinas Resmi BSrE';
+        const docTitle = this.inputMethod === 'file' ? ('Dokumen: ' + (this.fileName || 'Dokumen_Resmi.pdf')) : 'Dokumen Resmi ARSign';
         const timeStr = now.toLocaleTimeString('id-ID') + ' WIB';
 
         const registryItem = {
           id: receiptUUID,
           title: docTitle,
           signer: signerFullName,
-          institution: this.currentUser ? this.currentUser.institution : 'BSrE BSSN RI',
+          institution: this.currentUser ? this.currentUser.institution : 'ARSign (3 RPLK)',
           algorithm: algName,
           auth_method: this.lastAuthMethod,
           time: timeStr,
@@ -1059,7 +1059,7 @@ createApp({
     downloadReceipt() {
       if (!this.signedResult) return;
       const receiptData = JSON.stringify({
-        instansi: 'Balai Besar Sertifikasi Elektronik - BSSN',
+        instansi: 'ARSign Trust Network (3 RPLK)',
         status: 'RESMI_TERVERIFIKASI',
         standard: 'NIST FIPS 204 (ML-DSA)',
         metadata: this.signedResult
@@ -1178,7 +1178,7 @@ createApp({
       let detectedSig = '';
       let targetHash = computedHash;
 
-      // Cara A: Periksa metadata internal PDF (jika memuat embedded BSrE signature)
+      // Cara A: Periksa metadata internal PDF (jika memuat embedded ARSign signature)
       try {
         const pdfDoc = await PDFLib.PDFDocument.load(arrayBuf, { ignoreEncryption: true });
         const subject = pdfDoc.getSubject();
@@ -1190,8 +1190,8 @@ createApp({
           const keywords = pdfDoc.getKeywords();
           if (keywords && keywords.length > 0) {
             for (const kw of keywords) {
-              if (kw.startsWith('BSRE_SIG:')) detectedSig = kw.replace('BSRE_SIG:', '');
-              if (kw.startsWith('BSRE_HASH:')) targetHash = kw.replace('BSRE_HASH:', '');
+              if (kw.startsWith('ARSIGN_SIG:')) detectedSig = kw.replace('ARSIGN_SIG:', '');
+              if (kw.startsWith('ARSIGN_HASH:')) targetHash = kw.replace('ARSIGN_HASH:', '');
             }
           }
         }
@@ -1208,9 +1208,9 @@ createApp({
         }
       }
 
-      // Cara C: Cek apakah nama berkas memuat Nomor Registrasi BSrE (contoh: BSRE-TTE-747830)
+      // Cara C: Cek apakah nama berkas memuat Nomor Registrasi ARSign (contoh: ARS-TTE-747830)
       if (!detectedSig) {
-        const idMatch = file.name.match(/BSRE-[A-Z0-9-]+/i);
+        const idMatch = file.name.match(/ARS-[A-Z0-9-]+/i);
         if (idMatch) {
           const regId = idMatch[0].toUpperCase();
           const matchById = this.registryList.find(r => r.id.toUpperCase() === regId);
@@ -1325,7 +1325,7 @@ createApp({
     },
 
     async quickLogin(user) {
-      const defaultPwd = user.role === 'ASN' ? 'bsre2026' : 'warga2026';
+      const defaultPwd = user.role === 'ASN' ? 'arsign2026' : 'warga2026';
       await this.login(user.username, defaultPwd);
     },
 
@@ -1722,7 +1722,7 @@ createApp({
       ctx.ellipse(200, 310, 100, 60, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Badge verified BSrE
+      // Badge verified ARSign
       ctx.fillStyle = '#10b981';
       ctx.beginPath();
       ctx.arc(320, 80, 30, 0, Math.PI * 2);
@@ -1735,7 +1735,7 @@ createApp({
 
       ctx.font = 'bold 16px monospace';
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('BSrE FACE PASSKEY VERIFIED', 200, 380);
+      ctx.fillText('ARSIGN BIOMETRIC PASSKEY VERIFIED', 200, 380);
 
       this.onboarding.faceMasterSnapshot = canvas.toDataURL('image/jpeg', 0.9);
       this.onboarding.faceScanSuccess = true;

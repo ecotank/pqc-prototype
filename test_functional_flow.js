@@ -5,7 +5,7 @@ const { execSync } = require('child_process');
 
 async function main() {
   console.log('================================================================');
-  console.log(' PENGUJIAN FUNGSIONAL LENGKAP: ALUR PENGGUNA BARU & TTE PQC BSRE');
+  console.log(' PENGUJIAN FUNGSIONAL LENGKAP: ALUR PENGGUNA BARU & TTE PQC ARSIGN');
   console.log('================================================================\n');
 
   // 1. Uji Endpoint Key Generation Backend (NIST FIPS 204 ML-DSA-65)
@@ -23,7 +23,7 @@ async function main() {
   // 2. Simulasi 4 Tahap Onboarding Pengguna Baru
   console.log('\n[TAHAP 2] SIMULASI PENDAFTARAN & REGISTRASI PENGGUNA BARU...');
   // Step 1: Email + OTP Real Dispatch via API
-  const email = 'raden.haryo@bssn.go.id';
+  const email = 'radit@smallcircle.web.id';
   
   const sendResp = await fetch('http://localhost:8080/api/v1/auth/otp/send', {
     method: 'POST',
@@ -58,7 +58,7 @@ async function main() {
     username: 'raden.haryo',
     fullname: 'Dr. Raden Haryo Wicaksono, M.Cs.',
     nik_nip: '3271012304850005',
-    institution: 'Pusat Keamanan Siber Nasional BSSN',
+    institution: 'ARSign Trust Network (3 RPLK)',
     email: email,
     password: 'Password@2026',
     passphrase: 'RahasiaKripto2026!',
@@ -90,7 +90,7 @@ async function main() {
     signer_email: dummyUser.email,
     signer_nik: dummyUser.nik_nip,
     institution: dummyUser.institution,
-    receipt_id: 'BSRE-REC-' + Date.now(),
+    receipt_id: 'ARS-REC-' + Date.now(),
     mldsa_private_key: dummyUser.mldsa_private_key,
     mldsa_public_key: dummyUser.mldsa_public_key
   };
@@ -107,7 +107,7 @@ async function main() {
 
   const signData = signRes.data;
   console.log('  ✓ TTE Berhasil Diterapkan!');
-  console.log('  ✓ Tanda Terima BSrE      : ' + signData.receipt_id);
+  console.log('  ✓ Tanda Terima ARSign      : ' + signData.receipt_id);
   console.log('  ✓ Ukuran Signature ML-DSA: ' + (signData.mldsa_signature_hex.length/2) + ' bytes (FIPS 204: 3309 bytes)');
   console.log('  ✓ Kontainer PKCS#7       : ' + (signData.pkcs7_signature_hex.length/2) + ' bytes');
   console.log('  ✓ Waktu Komputasi        : ' + signData.duration_ms + ' ms');
@@ -150,11 +150,11 @@ async function main() {
 
   const certsText = execSync('openssl pkcs7 -in test_functional_pkcs7.p7s -inform DER -print_certs -text', { encoding: 'utf-8' });
   const hasSigner = certsText.includes('Dr. Raden Haryo Wicaksono');
-  const hasSubCA = certsText.includes('BSrE Sub-CA Pelayanan TTE Pascakuantum');
-  const hasRootCA = certsText.includes('BSrE BSSN Root CA');
+  const hasSubCA = certsText.includes('ARSign Sub-CA Pelayanan TTE Pascakuantum');
+  const hasRootCA = certsText.includes('ARSign Root CA');
   console.log(`  ✓ Sertifikat Penanda Tangan (${dummyUser.fullname}): ${hasSigner ? 'TERVERIFIKASI' : 'GAGAL'}`);
-  console.log(`  ✓ Rantai BSrE Sub-CA Pelayanan TTE                 : ${hasSubCA ? 'TERVERIFIKASI' : 'GAGAL'}`);
-  console.log(`  ✓ Rantai BSrE BSSN Root CA                         : ${hasRootCA ? 'TERVERIFIKASI' : 'GAGAL'}`);
+  console.log(`  ✓ Rantai ARSign Sub-CA Pelayanan TTE               : ${hasSubCA ? 'TERVERIFIKASI' : 'GAGAL'}`);
+  console.log(`  ✓ Rantai ARSign Root CA                         : ${hasRootCA ? 'TERVERIFIKASI' : 'GAGAL'}`);
 
   if (!hasSigner || !hasSubCA || !hasRootCA) {
     throw new Error('Verifikasi rantai sertifikat X.509 gagal!');

@@ -21,6 +21,18 @@ type AuditEntry struct {
 	Details    string  `json:"details"`
 }
 
+type SystemActivityLog struct {
+	ID        int64  `json:"id"`
+	Timestamp string `json:"timestamp"`
+	Category  string `json:"category"` // "SECURITY", "AUTH", "CRYPTO_PQC", "ERROR", "SYSTEM", "DOCUMENT", "ADMIN"
+	Level     string `json:"level"`    // "INFO", "WARN", "ERROR", "CRITICAL"
+	Actor     string `json:"actor"`
+	Action    string `json:"action"`
+	Details   string `json:"details"`
+	IPAddress string `json:"ip_address,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
+}
+
 type RegistryEntry struct {
 	ID           string `json:"id"`
 	Title        string `json:"title"`
@@ -95,6 +107,25 @@ func InitStorage(dbPath string) (*Storage, error) {
 		mldsa_private_key TEXT NOT NULL,
 		created_at TEXT NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS system_activity_logs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp TEXT NOT NULL,
+		category TEXT NOT NULL,
+		level TEXT NOT NULL,
+		actor TEXT NOT NULL,
+		action TEXT NOT NULL,
+		details TEXT NOT NULL,
+		ip_address TEXT,
+		user_agent TEXT
+	);
+
+	CREATE TABLE IF NOT EXISTS revoked_certificates (
+		serial_number TEXT PRIMARY KEY,
+		signer_name TEXT NOT NULL,
+		revocation_date TEXT NOT NULL,
+		reason TEXT NOT NULL
+	);
 	`
 
 	if _, err := db.Exec(createSchema); err != nil {
@@ -111,18 +142,18 @@ func (s *Storage) seedInitialData() {
 	_ = s.db.QueryRow("SELECT COUNT(*) FROM document_registry").Scan(&count)
 	if count == 0 {
 		_ = s.RecordRegistry(
-			"BSRE-PQC-2026-0091",
-			"Keputusan Kepala BSSN tentang Roadmap Migrasi Algoritma Kriptografi Pascakuantum 2026-2035",
-			"Satria Alba Pramasha",
+			"ARSIGN-2026-001",
+			"Spesifikasi Teknis Implementasi TTE Pascakuantum NIST FIPS 204 ML-DSA-65",
+			"Satria Alba (Tim ARSign 3 RPLK)",
 			"ML-DSA-65",
 			"2026-10-27 09:14 WIB",
 			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 			"",
 		)
 		_ = s.RecordRegistry(
-			"BSRE-PQC-2026-0089",
-			"Surat Edaran Bersama Standar Sertifikat Elektronik FIPS 204 Instansi Pemerintah",
-			"Satria Alba Pramasha",
+			"ARSIGN-2026-002",
+			"Laporan Pengujian Fungsional dan Kinerja TTE Pascakuantum ARSign",
+			"Radit & Sulthan (Tim ARSign 3 RPLK)",
 			"ML-DSA-65 + RSA",
 			"2026-10-26 14:32 WIB",
 			"d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
@@ -245,6 +276,136 @@ func (s *Storage) GetUsersList() ([]User, error) {
 		list = append(list, u)
 	}
 	return list, nil
+}
+
+// RecordActivity mencatat log komprehensif seluruh aktivitas sistem, error, dan perubahan
+func (s *Storage) RecordActivity(category, level, actor, action, details, ip, ua string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `INSERT INTO system_activity_logs (timestamp, category, level, actor, action, details, ip_address, user_agent) 
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_, err := s.db.Exec(query, now, category, level, actor, action, details, ip, ua)
+	return err
+}
+
+// GetSystemActivityLogs mengambil daftar log aktivitas terperinci dengan filter kategori & level
+func (s *Storage) GetSystemActivityLogs(category, level string, limit, offset int) ([]SystemActivityLog, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	whereClause := "WHERE 1=1"
+	var args []interface{}
+	if category != "" && category != "ALL" {
+		whereClause += " AND category = ?"
+		args = append(args, category)
+	}
+	if level != "" && level != "ALL" {
+		whereClause += " AND level = ?"
+		args = append(args, level)
+	}
+
+	var total int
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM system_activity_logs %s", whereClause)
+	_ = s.db.QueryRow(countQuery, args...).Scan(&total)
+
+	dataQuery := fmt.Sprintf("SELECT id, timestamp, category, level, actor, action, details, COALESCE(ip_address, ''), COALESCE(user_agent, '') FROM system_activity_logs %s ORDER BY id DESC LIMIT ? OFFSET ?", whereClause)
+	queryArgs := append(args, limit, offset)
+
+	rows, err := s.db.Query(dataQuery, queryArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var logs []SystemActivityLog
+	for rows.Next() {
+		var l SystemActivityLog
+		if err := rows.Scan(&l.ID, &l.Timestamp, &l.Category, &l.Level, &l.Actor, &l.Action, &l.Details, &l.IPAddress, &l.UserAgent); err != nil {
+			return nil, 0, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, total, nil
+}
+
+// GetSystemActivityStats mengembalikan statistik ringkasan aktivitas sistem
+func (s *Storage) GetSystemActivityStats() (map[string]interface{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	stats := make(map[string]interface{})
+
+	var totalLogs, errorCount, securityCount, docCount, revokedCount int
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM system_activity_logs").Scan(&totalLogs)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM system_activity_logs WHERE level = 'ERROR' OR level = 'CRITICAL'").Scan(&errorCount)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM system_activity_logs WHERE category = 'SECURITY'").Scan(&securityCount)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM document_registry").Scan(&docCount)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM revoked_certificates").Scan(&revokedCount)
+
+	stats["total_activity_logs"] = totalLogs
+	stats["total_errors"] = errorCount
+	stats["total_security_events"] = securityCount
+	stats["total_signed_documents"] = docCount
+	stats["total_revoked_certificates"] = revokedCount
+
+	return stats, nil
+}
+
+type RevokedCertificateEntry struct {
+	SerialNumber   string `json:"serial_number"`
+	SignerName     string `json:"signer_name"`
+	RevocationDate string `json:"revocation_date"`
+	Reason         string `json:"reason"`
+}
+
+func (s *Storage) RevokeCertificate(serialNumber, signerName, reason string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	query := `INSERT OR REPLACE INTO revoked_certificates (serial_number, signer_name, revocation_date, reason) VALUES (?, ?, ?, ?)`
+	_, err := s.db.Exec(query, serialNumber, signerName, now, reason)
+	return err
+}
+
+func (s *Storage) GetRevokedCertificates() ([]RevokedCertificateEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `SELECT serial_number, signer_name, revocation_date, reason FROM revoked_certificates ORDER BY revocation_date DESC`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []RevokedCertificateEntry
+	for rows.Next() {
+		var e RevokedCertificateEntry
+		if err := rows.Scan(&e.SerialNumber, &e.SignerName, &e.RevocationDate, &e.Reason); err != nil {
+			return nil, err
+		}
+		list = append(list, e)
+	}
+	return list, nil
+}
+
+func (s *Storage) IsCertificateRevoked(serialNumber string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var count int
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM revoked_certificates WHERE serial_number = ?", serialNumber).Scan(&count)
+	return count > 0
 }
 
 func (s *Storage) Close() error {

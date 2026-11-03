@@ -11,12 +11,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
 
-// BSrEAuthority mengelola infrastruktur kunci publik (PKI) resmi BSrE BSSN
-type BSrEAuthority struct {
+// ARSignAuthority mengelola infrastruktur kunci publik (PKI) resmi ARSign
+type ARSignAuthority struct {
 	mu           sync.RWMutex
 	RootKey      *rsa.PrivateKey
 	RootCert     *x509.Certificate
@@ -27,30 +29,58 @@ type BSrEAuthority struct {
 }
 
 var (
-	globalCA     *BSrEAuthority
+	globalCA     *ARSignAuthority
 	globalCAOnce sync.Once
 )
 
-// GetBSrEAuthority mengembalikan instance tunggal Otoritas Sertifikasi BSrE
-func GetBSrEAuthority() (*BSrEAuthority, error) {
+// GetARSignAuthority mengembalikan instance tunggal Otoritas Sertifikasi ARSign
+func GetARSignAuthority() (*ARSignAuthority, error) {
 	var err error
 	globalCAOnce.Do(func() {
-		globalCA, err = initBSrEAuthority()
+		globalCA, err = initARSignAuthority()
 	})
 	return globalCA, err
 }
 
-func initBSrEAuthority() (*BSrEAuthority, error) {
-	// 1. Bangkitkan Kunci & Sertifikat Root CA BSrE (Masa Berlaku 20 Tahun)
+func initARSignAuthority() (*ARSignAuthority, error) {
+	caDir := "ca_keys"
+	if err := os.MkdirAll(caDir, 0700); err != nil {
+		return nil, fmt.Errorf("gagal membuat direktori penyimpanan CA: %w", err)
+	}
+
+	rootKeyPath := filepath.Join(caDir, "arsign_root_ca.key")
+	rootCertPath := filepath.Join(caDir, "arsign_root_ca.crt")
+	subKeyPath := filepath.Join(caDir, "arsign_sub_ca.key")
+	subCertPath := filepath.Join(caDir, "arsign_sub_ca.crt")
+
+	// 1. Periksa apakah kunci & sertifikat CA sudah tersimpan permanen di disk
+	if fileExists(rootKeyPath) && fileExists(rootCertPath) && fileExists(subKeyPath) && fileExists(subCertPath) {
+		rootKey, rootCert, rootCertDER, err := loadKeyAndCert(rootKeyPath, rootCertPath)
+		if err == nil {
+			subKey, subCert, subCertDER, sErr := loadKeyAndCert(subKeyPath, subCertPath)
+			if sErr == nil {
+				return &ARSignAuthority{
+					RootKey:      rootKey,
+					RootCert:     rootCert,
+					RootCertDER:  rootCertDER,
+					SubCAKey:     subKey,
+					SubCACert:    subCert,
+					SubCACertDER: subCertDER,
+				}, nil
+			}
+		}
+	}
+
+	// 2. Jika belum ada di disk, bangkitkan Kunci & Sertifikat Root CA ARSign (Masa Berlaku 20 Tahun)
 	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, fmt.Errorf("gagal bangkitkan kunci Root CA: %w", err)
 	}
 
 	rootSubj := pkix.Name{
-		CommonName:         "BSrE BSSN Root CA (Pascakuantum Ready)",
-		Organization:       []string{"Badan Siber dan Sandi Negara"},
-		OrganizationalUnit: []string{"Balai Besar Sertifikasi Elektronik"},
+		CommonName:         "ARSign Root CA (Pascakuantum Ready)",
+		Organization:       []string{"ARSign Trust Network"},
+		OrganizationalUnit: []string{"Rekayasa Perangkat Lunak Kripto (3 RPLK)"},
 		Country:            []string{"ID"},
 		Province:           []string{"DKI Jakarta"},
 		Locality:           []string{"Jakarta Selatan"},
@@ -80,16 +110,16 @@ func initBSrEAuthority() (*BSrEAuthority, error) {
 		return nil, fmt.Errorf("gagal parsing Root CA: %w", err)
 	}
 
-	// 2. Bangkitkan Kunci & Sertifikat Sub-CA Penerbit TTE Instansi Pemerintah
+	// 3. Bangkitkan Kunci & Sertifikat Sub-CA Penerbit TTE ARSign (10 Tahun)
 	subKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, fmt.Errorf("gagal bangkitkan kunci Sub-CA: %w", err)
 	}
 
 	subSubj := pkix.Name{
-		CommonName:         "BSrE Sub-CA Pelayanan TTE Pascakuantum Nasional",
-		Organization:       []string{"Badan Siber dan Sandi Negara"},
-		OrganizationalUnit: []string{"Otoritas Sertifikasi Elektronik Induk"},
+		CommonName:         "ARSign Sub-CA Pelayanan TTE Pascakuantum",
+		Organization:       []string{"ARSign Trust Network"},
+		OrganizationalUnit: []string{"Tim Pengembang Alba-Radit-Sulthan (3 RPLK)"},
 		Country:            []string{"ID"},
 	}
 
@@ -118,7 +148,18 @@ func initBSrEAuthority() (*BSrEAuthority, error) {
 		return nil, fmt.Errorf("gagal parsing Sub-CA: %w", err)
 	}
 
-	return &BSrEAuthority{
+	// 4. Simpan Kunci & Sertifikat ke Disk Permanen
+	_ = saveKeyAndCert(rootKeyPath, rootCertPath, rootKey, rootCertDER)
+	_ = saveKeyAndCert(subKeyPath, subCertPath, subKey, subCertDER)
+
+	// Ekspor juga ke direktori utama agar mudah diakses
+	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER})
+	subPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: subCertDER})
+	_ = os.WriteFile("ARSIGN_Root_and_SubCA.pem", append(subPEM, rootPEM...), 0644)
+	_ = os.WriteFile("ARSIGN_Root_CA.crt", rootPEM, 0644)
+	_ = os.WriteFile("ARSIGN_Sub_CA.crt", subPEM, 0644)
+
+	return &ARSignAuthority{
 		RootKey:      rootKey,
 		RootCert:     rootCert,
 		RootCertDER:  rootCertDER,
@@ -128,8 +169,75 @@ func initBSrEAuthority() (*BSrEAuthority, error) {
 	}, nil
 }
 
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func saveKeyAndCert(keyPath, certPath string, key *rsa.PrivateKey, certDER []byte) error {
+	keyDER := x509.MarshalPKCS1PrivateKey(key)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDER})
+	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+		return err
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	return os.WriteFile(certPath, certPEM, 0644)
+}
+
+func loadKeyAndCert(keyPath, certPath string) (*rsa.PrivateKey, *x509.Certificate, []byte, error) {
+	keyPEM, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	keyBlock, _ := pem.Decode(keyPEM)
+	if keyBlock == nil {
+		return nil, nil, nil, fmt.Errorf("gagal decode key PEM %s", keyPath)
+	}
+	key, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	certPEM, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	certBlock, _ := pem.Decode(certPEM)
+	if certBlock == nil {
+		return nil, nil, nil, fmt.Errorf("gagal decode cert PEM %s", certPath)
+	}
+	cert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return key, cert, certBlock.Bytes, nil
+}
+
+// CreateCRL menerbitkan Certificate Revocation List (CRL) resmi X.509 RFC 5280
+func (ca *ARSignAuthority) CreateCRL(revokedList []pkix.RevokedCertificate) ([]byte, error) {
+	ca.mu.RLock()
+	defer ca.mu.RUnlock()
+
+	crlDER, err := ca.SubCACert.CreateCRL(rand.Reader, ca.SubCAKey, revokedList, time.Now(), time.Now().Add(7*24*time.Hour))
+	if err != nil {
+		return nil, fmt.Errorf("gagal menerbitkan CRL: %w", err)
+	}
+	return crlDER, nil
+}
+
+// ExportCRLPEM mengekspor CRL dalam format teks PEM
+func (ca *ARSignAuthority) ExportCRLPEM(revokedList []pkix.RevokedCertificate) (string, error) {
+	crlDER, err := ca.CreateCRL(revokedList)
+	if err != nil {
+		return "", err
+	}
+	crlPEM := pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: crlDER})
+	return string(crlPEM), nil
+}
+
 // IssueSignerCertificate menerbitkan sertifikat digital resmi X.509 penanda tangan
-func (ca *BSrEAuthority) IssueSignerCertificate(fullname, email, nikNip, institution string, signerPubKey *rsa.PublicKey) (*x509.Certificate, []byte, error) {
+func (ca *ARSignAuthority) IssueSignerCertificate(fullname, email, nikNip, institution string, signerPubKey *rsa.PublicKey) (*x509.Certificate, []byte, error) {
 	ca.mu.Lock()
 	defer ca.mu.Unlock()
 
@@ -176,7 +284,7 @@ func (ca *BSrEAuthority) IssueSignerCertificate(fullname, email, nikNip, institu
 }
 
 // ExportPEMCertificates mengekspor rantai sertifikat dalam format PEM
-func (ca *BSrEAuthority) ExportPEMCertificates() string {
+func (ca *ARSignAuthority) ExportPEMCertificates() string {
 	ca.mu.RLock()
 	defer ca.mu.RUnlock()
 

@@ -19,6 +19,8 @@ import (
 type OTPEntry struct {
 	Code      string
 	ExpiresAt time.Time
+	Attempts  int
+	LastSent  time.Time
 }
 
 var (
@@ -80,7 +82,7 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 	smtpPass := os.Getenv("SMTP_PASS")
 	smtpFrom := os.Getenv("SMTP_FROM")
 	if smtpFrom == "" {
-		smtpFrom = "no-reply@bsre.bssn.go.id"
+		smtpFrom = "no-reply@smallcircle.web.id"
 	}
 
 	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
@@ -89,13 +91,13 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #f8fafc; padding: 24px; margin: 0;">
   <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 14px; padding: 32px; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
     <div style="text-align: center; border-bottom: 1px solid #334155; padding-bottom: 20px; margin-bottom: 24px;">
-      <h2 style="color: #38bdf8; margin: 0; font-size: 20px; font-weight: 800;">Balai Besar Sertifikasi Elektronik (BSrE)</h2>
-      <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Badan Siber dan Sandi Negara RI</p>
+      <h2 style="color: #38bdf8; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em;">ARSign</h2>
+      <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Layanan TTE Pascakuantum • Tim 3 RPLK (Alba, Radit, Sulthan)</p>
     </div>
-    <h3 style="color: #ffffff; font-size: 17px; margin-top: 0;">Verifikasi Registrasi TTE Pascakuantum</h3>
+    <h3 style="color: #ffffff; font-size: 17px; margin-top: 0;">Verifikasi Akun Penandatangan ARSign</h3>
     <p style="color: #cbd5e1; font-size: 13.5px; line-height: 1.6;">
-      Yth. Pemohon Layanan TTE,<br><br>
-      Anda sedang melakukan pendaftaran akun resmi dan penerbitan sertifikat tanda tangan elektronik pascakuantum (NIST FIPS 204 ML-DSA-65). Gunakan kode verifikasi One-Time Password (OTP) berikut untuk menyelesaikan verifikasi email:
+      Halo,<br><br>
+      Anda sedang melakukan pendaftaran akun dan penerbitan sertifikat tanda tangan elektronik pascakuantum (NIST FIPS 204 ML-DSA-65) pada platform <b>ARSign</b>. Gunakan kode verifikasi One-Time Password (OTP) berikut untuk menyelesaikan verifikasi:
     </p>
     <div style="text-align: center; margin: 28px 0;">
       <div style="display: inline-block; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #38bdf8; background-color: #0f172a; padding: 14px 28px; border-radius: 10px; border: 1.5px solid #0284c7; box-shadow: 0 4px 12px rgba(2,132,199,0.3);">
@@ -104,28 +106,37 @@ func sendOTPViaEmail(recipientEmail, code string) error {
     </div>
     <p style="color: #94a3b8; font-size: 12px; line-height: 1.5;">
       ⏰ <b>Masa Berlaku:</b> 5 menit sejak email ini diterima.<br>
-      🔒 <b>Peringatan Keamanan:</b> Jangan bagikan kode ini kepada siapa pun termasuk petugas BSrE BSSN.
+      🔒 <b>Peringatan Keamanan:</b> Jangan bagikan kode rahasia ini kepada siapa pun.
     </p>
     <div style="border-top: 1px solid #334155; margin-top: 24px; padding-top: 18px; text-align: center; color: #64748b; font-size: 11px;">
-      Balai Besar Sertifikasi Elektronik - Badan Siber dan Sandi Negara<br>
-      Layanan TTE Pascakuantum Siap Produksi • Standar NIST FIPS 204
+      ARSign Platform — Rekayasa Perangkat Lunak Kripto (3 RPLK)<br>
+      Karya Kelompok: Alba • Radit • Sulthan • Standar NIST FIPS 204
     </div>
   </div>
 </body>
 </html>`, code)
 
-	// Opsi 1: Pengiriman via Resend API (Jika RESEND_API_KEY disetel)
-	resendKey := os.Getenv("RESEND_API_KEY")
-	if resendKey != "" {
+	// Opsi 1: Pengiriman via Brevo API
+	brevoKey := os.Getenv("BREVO_API_KEY")
+	if brevoKey != "" {
+		senderEmail := smtpUser
+		if senderEmail == "" {
+			senderEmail = "satrialbaa@gmail.com"
+		}
 		payload := map[string]interface{}{
-			"from":    "BSrE BSSN <onboarding@resend.dev>",
-			"to":      []string{recipientEmail},
-			"subject": fmt.Sprintf("Kode OTP Verifikasi TTE BSrE BSSN: %s", code),
-			"html":    htmlBody,
+			"sender": map[string]string{
+				"name":  "ARSign Verification",
+				"email": senderEmail,
+			},
+			"to": []map[string]string{
+				{"email": recipientEmail},
+			},
+			"subject":     fmt.Sprintf("Kode OTP Verifikasi ARSign: %s", code),
+			"htmlContent": htmlBody,
 		}
 		bodyBytes, _ := json.Marshal(payload)
-		req, _ := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(bodyBytes))
-		req.Header.Set("Authorization", "Bearer "+resendKey)
+		req, _ := http.NewRequest("POST", "https://api.brevo.com/v3/smtp/email", bytes.NewBuffer(bodyBytes))
+		req.Header.Set("api-key", brevoKey)
 		req.Header.Set("Content-Type", "application/json")
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
@@ -133,22 +144,23 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 			defer resp.Body.Close()
 			respBody, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode < 300 {
-				log.Printf("[BSrE EMAIL SERVICE] ✓ Email OTP BERHASIL DIKIRIM via Resend API ke: %s", recipientEmail)
+				log.Printf("[ARSIGN EMAIL] ✓ Email OTP BERHASIL DIKIRIM via Brevo API ke: %s", recipientEmail)
 				return nil
 			}
-			log.Printf("[BSrE EMAIL SERVICE] ⚠️ Resend API returned status %d: %s", resp.StatusCode, string(respBody))
+			log.Printf("[ARSIGN EMAIL] ⚠️ Brevo API returned status %d: %s", resp.StatusCode, string(respBody))
 		} else {
-			log.Printf("[BSrE EMAIL SERVICE] ⚠️ Resend API network error: %v", err)
+			log.Printf("[ARSIGN EMAIL] ⚠️ Brevo API error: %v", err)
 		}
 	}
 
-	// Opsi 2: Pengiriman via SMTP Relay (Gmail / Office365 / Corporate SMTP)
+	// Prioritaskan Opsi SMTP Relay jika disetel
 	if smtpHost != "" && smtpUser != "" && smtpPass != "" {
-		auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
+		cleanPass := strings.ReplaceAll(smtpPass, " ", "")
+		auth := smtp.PlainAuth("", smtpUser, cleanPass, smtpHost)
 		headers := make(map[string]string)
-		headers["From"] = fmt.Sprintf("BSrE BSSN <%s>", smtpFrom)
+		headers["From"] = fmt.Sprintf("ARSign <%s>", smtpFrom)
 		headers["To"] = recipientEmail
-		headers["Subject"] = fmt.Sprintf("Kode OTP Verifikasi TTE BSrE BSSN: %s", code)
+		headers["Subject"] = fmt.Sprintf("Kode OTP Verifikasi ARSign: %s", code)
 		headers["MIME-Version"] = "1.0"
 		headers["Content-Type"] = "text/html; charset=UTF-8"
 
@@ -161,14 +173,80 @@ func sendOTPViaEmail(recipientEmail, code string) error {
 		addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
 		err := smtp.SendMail(addr, auth, smtpFrom, []string{recipientEmail}, []byte(message.String()))
 		if err != nil {
-			log.Printf("[BSrE EMAIL SERVICE] Gagal mengirim email via SMTP (%s): %v", addr, err)
-			return err
+			log.Printf("[ARSIGN EMAIL] ⚠️ Gagal mengirim email via SMTP (%s): %v", addr, err)
+		} else {
+			log.Printf("[ARSIGN EMAIL] ✓ Email OTP BERHASIL DIKIRIM via SMTP ke: %s", recipientEmail)
+			return nil
 		}
-		log.Printf("[BSrE EMAIL SERVICE] ✓ Email OTP BERHASIL DIKIRIM via SMTP ke: %s", recipientEmail)
-		return nil
 	}
 
-	log.Printf("[BSrE EMAIL SERVICE] ✉️ [PENGIRIMAN EMAIL OTP RESMI] Menuju: %s | Kode: %s | Status: Terkirim ke mailbox (Set SMTP_HOST/SMTP_USER/SMTP_PASS untuk relay SMTP live)", recipientEmail, code)
+	// Opsi Utama: Pengiriman via Resend API
+	resendKey := os.Getenv("RESEND_API_KEY")
+	if resendKey != "" {
+		resendFrom := os.Getenv("RESEND_FROM")
+		if resendFrom == "" {
+			resendFrom = "ARSign <no-reply@smallcircle.web.id>"
+		}
+		fallbackEmail := os.Getenv("RESEND_FALLBACK_EMAIL")
+		if fallbackEmail == "" {
+			fallbackEmail = "satrialbaa@gmail.com"
+		}
+
+		sendReq := func(toEmail, fromSender, subject, content string) (int, []byte, error) {
+			payload := map[string]interface{}{
+				"from":    fromSender,
+				"to":      []string{toEmail},
+				"subject": subject,
+				"html":    content,
+			}
+			bodyBytes, _ := json.Marshal(payload)
+			req, _ := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(bodyBytes))
+			req.Header.Set("Authorization", "Bearer "+resendKey)
+			req.Header.Set("Content-Type", "application/json")
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				return 0, nil, err
+			}
+			defer resp.Body.Close()
+			respBody, _ := io.ReadAll(resp.Body)
+			return resp.StatusCode, respBody, nil
+		}
+
+		// 1. Kirim langsung dari domain resmi ARSign
+		subject := fmt.Sprintf("Kode OTP Verifikasi ARSign: %s", code)
+		status, respBody, err := sendReq(recipientEmail, resendFrom, subject, htmlBody)
+		if err == nil && status < 300 {
+			log.Printf("[ARSIGN EMAIL] ✓ Email OTP BERHASIL DIKIRIM via Resend API ke: %s", recipientEmail)
+			return nil
+		}
+
+		// 2. Fallback sandbox jika memakai domain uji
+		isSandbox := strings.Contains(resendFrom, "onboarding@resend.dev")
+		appEnv := strings.ToLower(os.Getenv("APP_ENV"))
+		if isSandbox && appEnv != "production" && fallbackEmail != "" && !strings.EqualFold(recipientEmail, fallbackEmail) {
+			log.Printf("[ARSIGN EMAIL] ℹ️ Resend sandbox membatasi tujuan ke %s. Meneruskan ke %s...", recipientEmail, fallbackEmail)
+			forwardSubject := fmt.Sprintf("[ARSign Sandbox] Pemohon %s: %s", recipientEmail, code)
+			forwardNotice := fmt.Sprintf(`
+      <div style="background-color: #0369a1; padding: 14px 18px; border-radius: 8px; margin-bottom: 22px; font-size: 13.5px; color: #ffffff; border: 1.5px solid #38bdf8; line-height: 1.5;">
+        🔔 <b>ARSign Sandbox Notice:</b><br>
+        Kode OTP ini diterbitkan untuk pemohon: <b style="color: #fef08a;">%s</b>.
+      </div>`, recipientEmail)
+
+			forwardHtml := strings.Replace(htmlBody, `<h3 style="color: #ffffff; font-size: 17px; margin-top: 0;">`, forwardNotice+`<h3 style="color: #ffffff; font-size: 17px; margin-top: 0;">`, 1)
+
+			fStatus, fBody, fErr := sendReq(fallbackEmail, resendFrom, forwardSubject, forwardHtml)
+			if fErr == nil && fStatus < 300 {
+				log.Printf("[ARSIGN EMAIL] ✓ Email OTP DITERUSKAN via Resend ke verifikator: %s", fallbackEmail)
+				return nil
+			}
+			log.Printf("[ARSIGN EMAIL] ⚠️ Resend forwarding error (status %d): %s", fStatus, string(fBody))
+		} else {
+			log.Printf("[ARSIGN EMAIL] ⚠️ Resend API gagal kirim ke %s (status %d): %s", recipientEmail, status, string(respBody))
+		}
+	}
+
+	log.Printf("[ARSIGN EMAIL] ✉️ [KODE OTP ARSIGN]: Menuju: %s | Kode: %s", recipientEmail, code)
 	return nil
 }
 
@@ -185,11 +263,24 @@ func (h *APIHandler) HandleAuthSendOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code := generateOTPCode()
 	otpMu.Lock()
+	if entry, exists := otpStore[email]; exists {
+		// Proteksi produksi: cooldown 60 detik cegah flooding email jika OTP masih aktif
+		if time.Now().Before(entry.ExpiresAt) && time.Since(entry.LastSent) < 60*time.Second {
+			remaining := int(60 - time.Since(entry.LastSent).Seconds())
+			otpMu.Unlock()
+			_ = h.store.RecordActivity("SECURITY", "WARN", email, "OTP_RATE_LIMIT", fmt.Sprintf("Permintaan OTP ditolak karena cooldown (%d detik tersisa)", remaining), r.RemoteAddr, r.UserAgent())
+			SendError(w, http.StatusTooManyRequests, fmt.Sprintf("Mohon tunggu %d detik sebelum meminta kode OTP baru.", remaining))
+			return
+		}
+	}
+
+	code := generateOTPCode()
 	otpStore[email] = OTPEntry{
 		Code:      code,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
+		Attempts:  0,
+		LastSent:  time.Now(),
 	}
 	otpMu.Unlock()
 
@@ -198,6 +289,7 @@ func (h *APIHandler) HandleAuthSendOTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	_ = h.store.RecordAudit("SendOTP", "AUTH", 0, "SUCCESS", fmt.Sprintf("Kode OTP dikirimkan ke email %s", email))
+	_ = h.store.RecordActivity("AUTH", "INFO", email, "OTP_SEND", fmt.Sprintf("Kode OTP verifikasi dikirimkan ke %s", email), r.RemoteAddr, r.UserAgent())
 
 	SendSuccess(w, map[string]interface{}{
 		"sent":     true,
@@ -220,6 +312,7 @@ func (h *APIHandler) HandleAuthVerifyOTP(w http.ResponseWriter, r *http.Request)
 	entry, exists := otpStore[email]
 	if !exists {
 		otpMu.Unlock()
+		_ = h.store.RecordActivity("SECURITY", "WARN", email, "OTP_NOT_FOUND", "Verifikasi OTP gagal (tidak ditemukan atau kedaluwarsa)", r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusBadRequest, "Kode OTP belum dikirimkan ke email ini atau telah kadaluarsa. Silakan kirim ulang.")
 		return
 	}
@@ -227,21 +320,36 @@ func (h *APIHandler) HandleAuthVerifyOTP(w http.ResponseWriter, r *http.Request)
 	if time.Now().After(entry.ExpiresAt) {
 		delete(otpStore, email)
 		otpMu.Unlock()
+		_ = h.store.RecordActivity("SECURITY", "WARN", email, "OTP_EXPIRED", "Verifikasi OTP gagal (melewati batas 5 menit)", r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusBadRequest, "Kode OTP telah kadaluarsa (melewati batas 5 menit). Silakan kirim ulang.")
 		return
 	}
 
 	if entry.Code != code {
+		entry.Attempts++
+		if entry.Attempts >= 3 {
+			delete(otpStore, email)
+			otpMu.Unlock()
+			_ = h.store.RecordAudit("VerifyOTP", "AUTH", 0, "BLOCKED", fmt.Sprintf("Percobaan verifikasi OTP email %s diblokir (melebihi batas 3 kali)", email))
+			_ = h.store.RecordActivity("SECURITY", "CRITICAL", email, "OTP_BRUTE_FORCE_BLOCKED", fmt.Sprintf("Percobaan verifikasi OTP email %s diblokir (melebihi batas 3 kali)", email), r.RemoteAddr, r.UserAgent())
+			SendError(w, http.StatusUnauthorized, "Kode OTP salah. Batas percobaan (3 kali) terlampaui. Kode dibatalkan demi keamanan.")
+			return
+		}
+		otpStore[email] = entry
+		remaining := 3 - entry.Attempts
 		otpMu.Unlock()
-		SendError(w, http.StatusBadRequest, "Kode OTP tidak cocok. Periksa kembali email Anda.")
+		_ = h.store.RecordAudit("VerifyOTP", "AUTH", 0, "FAILED", fmt.Sprintf("Kode OTP salah untuk email %s (sisa percobaan: %d)", email, remaining))
+		_ = h.store.RecordActivity("SECURITY", "WARN", email, "OTP_VERIFY_FAILED", fmt.Sprintf("Kode OTP salah untuk email %s (sisa percobaan: %d)", email, remaining), r.RemoteAddr, r.UserAgent())
+		SendError(w, http.StatusBadRequest, fmt.Sprintf("Kode OTP tidak cocok. Sisa kesempatan: %d kali.", remaining))
 		return
 	}
 
-	// OTP Valid: hapus dari penyimpanan agar tidak dapat dipakai ulang
+	// OTP Valid: hapus dari penyimpanan agar tidak dapat dipakai ulang (Replay Attack Prevention)
 	delete(otpStore, email)
 	otpMu.Unlock()
 
 	_ = h.store.RecordAudit("VerifyOTP", "AUTH", 0, "SUCCESS", fmt.Sprintf("Email %s berhasil diverifikasi via OTP", email))
+	_ = h.store.RecordActivity("AUTH", "INFO", email, "OTP_VERIFY_SUCCESS", fmt.Sprintf("Email %s berhasil diverifikasi via OTP", email), r.RemoteAddr, r.UserAgent())
 
 	SendSuccess(w, map[string]interface{}{
 		"verified": true,

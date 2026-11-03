@@ -36,16 +36,16 @@ func TestPAdESSigningAndVerification(t *testing.T) {
 	mldsaSK, _ := hex.DecodeString(mldsaKey.PrivateKeyHex)
 	mldsaPK, _ := hex.DecodeString(mldsaKey.PublicKeyHex)
 
-	receiptID := "BSRE-TEST-998811"
+	receiptID := "ARS-TEST-998811"
 
 	// 3. Terapkan TTE PAdES ISO 32000
 	signedPDF, result, err := SignPDFPAdES(
 		dummyPDF,
 		PAdESSignOptions{
 			SignerFullName:  "Satria Alba Pramasha, S.Tr.Kom.",
-			SignerEmail:     "satria.alba@bsre.bssn.go.id",
+			SignerEmail:     "alba@smallcircle.web.id",
 			SignerNIK:       "199910262024011001",
-			Institution:     "Balai Besar Sertifikasi Elektronik (BSrE) - BSSN",
+			Institution:     "ARSign Trust Network (3 RPLK)",
 			RSAKey:          rsaKey,
 			MLDSAPrivateKey: mldsaSK,
 			MLDSAPublicKey:  mldsaPK,

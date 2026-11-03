@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Laboratorium Visualisasi Proses Kriptografi ML-DSA (FIPS 204) - BSrE BSSN</title>
+  <title>Laboratorium Visualisasi Proses Kriptografi ML-DSA (FIPS 204) - ARSign</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -67,7 +67,7 @@
               <span class="font-bold text-white text-base">Laboratorium Kriptografi Pascakuantum</span>
               <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">FIPS 204 Deep Dive</span>
             </div>
-            <div class="text-xs text-slate-400">Inspeksi Alur Internal Penandatanganan & Verifikasi ML-DSA • Kelompok RPLK 2 BSrE</div>
+            <div class="text-xs text-slate-400">Inspeksi Alur Internal Penandatanganan & Verifikasi ML-DSA • Tim 3 RPLK: Alba, Radit, Sulthan</div>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
           <div class="flex items-center space-x-3">
             <select v-model="selectedAlg" @change="onAlgChange" class="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg px-3 py-2">
               <option value="ML-DSA-44">ML-DSA-44 (k=4, l=4)</option>
-              <option value="ML-DSA-65">ML-DSA-65 (k=6, l=5) - BSrE</option>
+              <option value="ML-DSA-65">ML-DSA-65 (k=6, l=5) - ARSign</option>
               <option value="ML-DSA-87">ML-DSA-87 (k=8, l=7)</option>
             </select>
             <button @click="runSigningTrace" :disabled="isTracing" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-purple-600/30 transition flex items-center space-x-2">
@@ -322,7 +322,7 @@
 
     <!-- Footer -->
     <footer class="border-t border-slate-800 bg-slate-950 px-4 py-4 text-xs text-slate-500 text-center">
-      Laboratorium Riset Kriptografi Pascakuantum • Balai Besar Sertifikasi Elektronik (BSrE) BSSN • Sesuai NIST FIPS 204
+      Laboratorium Riset Kriptografi Pascakuantum • ARSign Trust Network (Alba, Radit, Sulthan - 3 RPLK) • Sesuai NIST FIPS 204
     </footer>
   </div>
 

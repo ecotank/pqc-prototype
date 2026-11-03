@@ -25,7 +25,7 @@ var (
 	oidContentType      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 3}
 	oidMessageDigest    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}
 	oidSigningTime      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}
-	oidPQCDualSignature = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 58333, 1, 204} // OID Ekstensi PQC BSrE
+	oidPQCDualSignature = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 58333, 1, 204} // OID Ekstensi PQC ARSign
 )
 
 type ContentInfo struct {
@@ -206,7 +206,7 @@ type PAdESSignOptions struct {
 func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResult, error) {
 	start := time.Now()
 
-	ca, err := GetBSrEAuthority()
+	ca, err := GetARSignAuthority()
 	if err != nil {
 		return nil, nil, fmt.Errorf("gagal inisialisasi CA: %w", err)
 	}
@@ -221,20 +221,20 @@ func SignPDFPAdES(pdfData []byte, opts PAdESSignOptions) ([]byte, *PAdESSignResu
 
 	receiptId := opts.ReceiptID
 	if receiptId == "" {
-		receiptId = fmt.Sprintf("BSRE-%d", time.Now().UnixNano()%10000000)
+		receiptId = fmt.Sprintf("ARS-%d", time.Now().UnixNano()%10000000)
 	}
 
 	fullname := opts.SignerFullName
 	if fullname == "" {
-		fullname = "Pejabat Penandatangan BSrE"
+		fullname = "Penanda Tangan ARSign"
 	}
 	email := opts.SignerEmail
 	if email == "" {
-		email = "signer@bsre.bssn.go.id"
+		email = "signer@smallcircle.web.id"
 	}
 	institution := opts.Institution
 	if institution == "" {
-		institution = "Badan Siber dan Sandi Negara"
+		institution = "ARSign Trust Network (3 RPLK)"
 	}
 
 	signerCert, signerCertDER, err := ca.IssueSignerCertificate(fullname, email, opts.SignerNIK, institution, &rsaKey.PublicKey)
@@ -388,7 +388,7 @@ func appendPDFSignatureStructure(originalPDF []byte, signerName, receiptId strin
 	buf.WriteString(">\n")
 	fmt.Fprintf(&buf, "  /Name (%s)\n", signerName)
 	fmt.Fprintf(&buf, "  /M (D:%s)\n", nowStr)
-	fmt.Fprintf(&buf, "  /Reason (TTE Pascakuantum Sah BSrE BSSN RI - FIPS 204 ML-DSA-65)\n")
+	fmt.Fprintf(&buf, "  /Reason (TTE Pascakuantum Sah ARSign - FIPS 204 ML-DSA-65)\n")
 	fmt.Fprintf(&buf, "  /Location (Jakarta, Indonesia)\n")
 	buf.WriteString(">>\n")
 	buf.WriteString("endobj\n\n")
@@ -400,7 +400,7 @@ func appendPDFSignatureStructure(originalPDF []byte, signerName, receiptId strin
 	buf.WriteString("  /Type /Annot\n")
 	buf.WriteString("  /Subtype /Widget\n")
 	buf.WriteString("  /FT /Sig\n")
-	fmt.Fprintf(&buf, "  /T (BSRE_SIG_%s)\n", receiptId)
+	fmt.Fprintf(&buf, "  /T (ARS_SIG_%s)\n", receiptId)
 	fmt.Fprintf(&buf, "  /V %d 0 R\n", sigDictID)
 	buf.WriteString("  /F 4\n")
 	buf.WriteString("  /Rect [ 350 50 560 142 ]\n")

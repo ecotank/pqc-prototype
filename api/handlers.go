@@ -2,10 +2,12 @@ package api
 
 import (
 	"crypto/sha256"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"strings"
 	"sync"
@@ -100,7 +102,7 @@ func (h *APIHandler) HandleSign(w http.ResponseWriter, r *http.Request) {
 
 	signer := req.SignerID
 	if signer == "" {
-		signer = "satria.alba@bsre.bssn.go.id"
+		signer = "alba@smallcircle.web.id"
 	}
 
 	algUpper := strings.ToUpper(strings.TrimSpace(req.Algorithm))
@@ -379,7 +381,7 @@ func (h *APIHandler) HandleBenchmarkExport(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"pqc_bsre_benchmark.csv\"")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"pqc_arsign_benchmark.csv\"")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(w, string(csvBytes))
 }
@@ -508,33 +510,33 @@ func (h *APIHandler) seedDefaultUsers() {
 		Role        string
 	}{
 		{
-			ID:          "USR-BSRE-01",
+			ID:          "USR-ARS-01",
 			Username:    "satria.alba",
-			Password:    "bsre2026",
-			FullName:    "Satria Alba Pramasha, S.Tr.Kom.",
-			NikNip:      "19991026 202401 1 001",
-			Institution: "Balai Besar Sertifikasi Elektronik (BSrE) - BSSN",
-			Email:       "satria.alba@bsre.bssn.go.id",
+			Password:    "arsign2026",
+			FullName:    "Satria Alba (Tim ARSign)",
+			NikNip:      "3271012610010001",
+			Institution: "Kelas 3 RPLK",
+			Email:       "alba@smallcircle.web.id",
 			Role:        "ASN",
 		},
 		{
-			ID:          "USR-BSRE-02",
-			Username:    "ezra.dhiatara",
-			Password:    "bsre2026",
-			FullName:    "Muhammad Ezra Dhiatara, S.Tr.Kom.",
-			NikNip:      "19980512 202302 1 002",
-			Institution: "Balai Besar Sertifikasi Elektronik (BSrE) - BSSN",
-			Email:       "ezra.dhiatara@bsre.bssn.go.id",
+			ID:          "USR-ARS-02",
+			Username:    "raditya",
+			Password:    "arsign2026",
+			FullName:    "Raditya (Tim ARSign)",
+			NikNip:      "3271011205010002",
+			Institution: "Kelas 3 RPLK",
+			Email:       "radit@smallcircle.web.id",
 			Role:        "ASN",
 		},
 		{
-			ID:          "USR-BSRE-03",
+			ID:          "USR-ARS-03",
 			Username:    "sulthan.aidhan",
-			Password:    "bsre2026",
-			FullName:    "Sulthan Aidhan Afiq Sukarto, S.Tr.Kom.",
-			NikNip:      "19990415 202401 1 003",
-			Institution: "Balai Besar Sertifikasi Elektronik (BSrE) - BSSN",
-			Email:       "sulthan.aidhan@bsre.bssn.go.id",
+			Password:    "arsign2026",
+			FullName:    "Sulthan Aidhan (Tim ARSign)",
+			NikNip:      "3271011504010003",
+			Institution: "Kelas 3 RPLK",
+			Email:       "sulthan@smallcircle.web.id",
 			Role:        "ASN",
 		},
 		{
@@ -554,6 +556,7 @@ func (h *APIHandler) seedDefaultUsers() {
 		if err != nil {
 			continue
 		}
+		encPrivKey, _ := crypto.EncryptPrivateKey(keyRes.PrivateKeyHex, d.Password)
 		_ = h.store.CreateUser(&storage.User{
 			ID:              d.ID,
 			Username:        d.Username,
@@ -564,7 +567,7 @@ func (h *APIHandler) seedDefaultUsers() {
 			Email:           d.Email,
 			Role:            d.Role,
 			MldsaPublicKey:  keyRes.PublicKeyHex,
-			MldsaPrivateKey: keyRes.PrivateKeyHex,
+			MldsaPrivateKey: encPrivKey,
 			CreatedAt:       time.Now().Format("2006-01-02 15:04:05"),
 		})
 	}
@@ -589,11 +592,18 @@ func (h *APIHandler) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.PasswordHash != storage.HashPassword(req.Password) {
+		_ = h.store.RecordActivity("SECURITY", "WARN", req.Username, "AUTH_LOGIN_FAILED", "Percobaan login gagal (kata sandi salah)", r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusUnauthorized, "Nama pengguna atau kata sandi salah")
 		return
 	}
 
 	_ = h.store.RecordAudit("AuthLogin", "ML-DSA-65", 0, "SUCCESS", fmt.Sprintf("Pengguna %s (%s) berhasil masuk", user.Username, user.FullName))
+	_ = h.store.RecordActivity("AUTH", "INFO", user.Username, "AUTH_LOGIN_SUCCESS", fmt.Sprintf("Pengguna %s (%s) berhasil masuk ke sistem", user.Username, user.FullName), r.RemoteAddr, r.UserAgent())
+
+	// Dekripsi kunci privat ML-DSA menggunakan kata sandi pengguna secara in-memory
+	if decKey, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, req.Password); err == nil {
+		user.MldsaPrivateKey = decKey
+	}
 
 	user.PasswordHash = ""
 	SendSuccess(w, user, "Berhasil masuk ke layanan")
@@ -637,6 +647,12 @@ func (h *APIHandler) HandleAuthRegister(w http.ResponseWriter, r *http.Request) 
 		role = "PUBLIC"
 	}
 
+	encPrivKey, err := crypto.EncryptPrivateKey(keyRes.PrivateKeyHex, req.Password)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal mengamankan kunci privat kriptografi: "+err.Error())
+		return
+	}
+
 	newID := fmt.Sprintf("USR-%s-%d", role, time.Now().Unix()%1000000)
 	user := &storage.User{
 		ID:              newID,
@@ -648,18 +664,21 @@ func (h *APIHandler) HandleAuthRegister(w http.ResponseWriter, r *http.Request) 
 		Email:           strings.TrimSpace(req.Email),
 		Role:            role,
 		MldsaPublicKey:  keyRes.PublicKeyHex,
-		MldsaPrivateKey: keyRes.PrivateKeyHex,
+		MldsaPrivateKey: encPrivKey,
 		CreatedAt:       time.Now().Format("2006-01-02 15:04:05"),
 	}
 
 	if err := h.store.CreateUser(user); err != nil {
+		_ = h.store.RecordActivity("ERROR", "ERROR", user.Username, "AUTH_REGISTER_ERROR", err.Error(), r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusInternalServerError, "Gagal menyimpan akun: "+err.Error())
 		return
 	}
 
 	_ = h.store.RecordAudit("AuthRegister", "ML-DSA-65", 0, "SUCCESS", fmt.Sprintf("Registrasi akun baru %s (%s)", user.Username, user.FullName))
+	_ = h.store.RecordActivity("AUTH", "INFO", user.Username, "AUTH_REGISTER_SUCCESS", fmt.Sprintf("Akun baru %s (%s, NIK: %s) terdaftar dengan sertifikat ML-DSA-65", user.Username, user.FullName, user.NikNip), r.RemoteAddr, r.UserAgent())
 
 	user.PasswordHash = ""
+	user.MldsaPrivateKey = keyRes.PrivateKeyHex // Kembalikan ke pengguna untuk sesi lokal saat ini
 	SendSuccess(w, user, "Akun berhasil didaftarkan bersama kunci ML-DSA-65")
 }
 
@@ -735,11 +754,13 @@ func (h *APIHandler) HandlePAdESSign(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		_ = h.store.RecordAudit("PAdESSign", "ML-DSA-65+RSA", 0, "FAILED", err.Error())
+		_ = h.store.RecordActivity("ERROR", "ERROR", req.SignerFullName, "PAdES_SIGN_FAILED", err.Error(), r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusInternalServerError, "Gagal menandatangani PAdES ISO 32000-1: "+err.Error())
 		return
 	}
 
 	_ = h.store.RecordAudit("PAdESSign", "ML-DSA-65+RSA", res.DurationMs, "SUCCESS", fmt.Sprintf("Dokumen PAdES ditandatangani untuk %s (ID: %s)", res.SignerFullName, res.ReceiptID))
+	_ = h.store.RecordActivity("CRYPTO_PQC", "INFO", res.SignerFullName, "PAdES_SIGN_ML_DSA_65", fmt.Sprintf("Dokumen PAdES ISO 32000-1 berhasil ditandatangani (Tanda Terima: %s, Hash: %s, Waktu: %.2f ms)", res.ReceiptID, res.DocumentHash, res.DurationMs), r.RemoteAddr, r.UserAgent())
 
 	pdfB64 := hex.EncodeToString(signedPDF) // Return hex atau base64
 	SendSuccess(w, PAdESSignResponse{
@@ -755,7 +776,7 @@ func (h *APIHandler) HandlePAdESSign(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request) {
-	ca, err := crypto.GetBSrEAuthority()
+	ca, err := crypto.GetARSignAuthority()
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, "Gagal inisialisasi CA: "+err.Error())
 		return
@@ -764,7 +785,7 @@ func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request
 	format := r.URL.Query().Get("format")
 	if format == "pem" {
 		w.Header().Set("Content-Type", "application/x-pem-file")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"BSRE_PQC_Root_and_SubCA.pem\"")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"ARSIGN_Root_and_SubCA.pem\"")
 		_, _ = w.Write([]byte(ca.ExportPEMCertificates()))
 		return
 	}
@@ -780,7 +801,7 @@ func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request
 	}
 
 	SendSuccess(w, map[string]interface{}{
-		"ca_name":     "Balai Besar Sertifikasi Elektronik (BSrE) BSSN",
+		"ca_name":     "ARSign Trust Network (Tim 3 RPLK: Alba, Radit, Sulthan)",
 		"chain_pem":   ca.ExportPEMCertificates(),
 		"root_ca": CACertInfo{
 			Subject:      ca.RootCert.Subject.String(),
@@ -797,5 +818,92 @@ func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request
 			NotAfter:     ca.SubCACert.NotAfter.Format(time.RFC3339),
 		},
 	}, "")
+}
+
+func (h *APIHandler) HandleCACRL(w http.ResponseWriter, r *http.Request) {
+	ca, err := crypto.GetARSignAuthority()
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal inisialisasi CA: "+err.Error())
+		return
+	}
+
+	revokedEntries, err := h.store.GetRevokedCertificates()
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal memuat daftar pencabutan sertifikat: "+err.Error())
+		return
+	}
+
+	var pkixRevoked []pkix.RevokedCertificate
+	for _, entry := range revokedEntries {
+		sn := new(big.Int)
+		sn.SetString(entry.SerialNumber, 10)
+		t, err := time.Parse("2006-01-02 15:04:05", entry.RevocationDate)
+		if err != nil {
+			t = time.Now()
+		}
+		pkixRevoked = append(pkixRevoked, pkix.RevokedCertificate{
+			SerialNumber:   sn,
+			RevocationTime: t,
+		})
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "pem" {
+		crlPEM, err := ca.ExportCRLPEM(pkixRevoked)
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, "Gagal generate CRL PEM: "+err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-pkcs7-crl")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"arsign_sub_ca.crl\"")
+		_, _ = w.Write([]byte(crlPEM))
+		return
+	}
+
+	SendSuccess(w, map[string]interface{}{
+		"issuer":        ca.SubCACert.Subject.String(),
+		"total_revoked": len(revokedEntries),
+		"revoked_list":  revokedEntries,
+		"this_update":   time.Now().Format(time.RFC3339),
+		"next_update":   time.Now().Add(7 * 24 * time.Hour).Format(time.RFC3339),
+	}, "Certificate Revocation List (CRL) resmi ARSign")
+}
+
+type RevokeReq struct {
+	SerialNumber string `json:"serial_number"`
+	SignerName   string `json:"signer_name"`
+	Reason       string `json:"reason"`
+}
+
+func (h *APIHandler) HandleCARevoke(w http.ResponseWriter, r *http.Request) {
+	var req RevokeReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+
+	if req.SerialNumber == "" {
+		SendError(w, http.StatusBadRequest, "Parameter serial_number wajib diisi")
+		return
+	}
+
+	reason := req.Reason
+	if reason == "" {
+		reason = "keyCompromise"
+	}
+
+	if err := h.store.RevokeCertificate(req.SerialNumber, req.SignerName, reason); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal mencabut sertifikat: "+err.Error())
+		return
+	}
+
+	_ = h.store.RecordActivity("SECURITY", "CRITICAL", req.SignerName, "CERTIFICATE_REVOCATION", fmt.Sprintf("Sertifikat Serial #%s dicabut resmi (Alasan: %s)", req.SerialNumber, reason), r.RemoteAddr, r.UserAgent())
+	SendSuccess(w, map[string]interface{}{
+		"serial_number":   req.SerialNumber,
+		"signer_name":     req.SignerName,
+		"revoked":         true,
+		"reason":          reason,
+		"revocation_time": time.Now().Format(time.RFC3339),
+	}, "Sertifikat elektronik berhasil dicabut resmi")
 }
 

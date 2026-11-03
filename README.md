@@ -1,7 +1,7 @@
-# Purwarupa Penandatanganan Digital ML-DSA (NIST FIPS 204) & Simulasi Migrasi RSA ke PQC
-**Balai Besar Sertifikasi Elektronik (BSrE) - Badan Siber dan Sandi Negara (BSSN)**
+# ARSign — Platform Penandatanganan Digital Pascakuantum ML-DSA (NIST FIPS 204)
+**Proyek Rekayasa Perangkat Lunak Kripto — Tim 3 RPLK: Alba, Radit, Sulthan**
 
-Purwarupa (Proof of Concept / Mini Project) penandatanganan digital pascakuantum berbasis **ML-DSA (Module-Lattice-Based Digital Signature Algorithm - NIST FIPS 204)** dengan perbandingan performa dan karakteristik terhadap **RSA-2048 / RSA-3072**, meniru pola layanan **Esign Client Service (ECS)** BSrE.
+Purwarupa (Proof of Concept / Mini Project) penandatanganan digital pascakuantum berbasis **ML-DSA (Module-Lattice-Based Digital Signature Algorithm - NIST FIPS 204)** dengan perbandingan performa dan karakteristik terhadap **RSA-2048 / RSA-3072**, mengadopsi arsitektur standar TTE ISO 32000-1 / PAdES dan NIST FIPS 204.
 
 Tersedia **2 Antarmuka Web Terpisah**:
 1. **Web Siap Produksi (Enterprise TTE Portal)**: Tampilan bersih, resmi, siap pakai untuk pengguna/instansi pemerintah (layanan TTE publik).
@@ -9,10 +9,10 @@ Tersedia **2 Antarmuka Web Terpisah**:
 
 ---
 
-## 👥 Tim Pengembang (Kelompok RPLK 2 BSrE)
-- **Muhammad Ezra Dhiatara** (NPM: 2322101945) - Layanan Penandatanganan Golang & Arsitektur API
-- **Satria Alba Pramasha** (NPM: 2322101974) - Kriptografi Pascakuantum & Kepatuhan FIPS 204
-- **Sulthan Aidhan Afiq Sukarto** (NPM: 2322101979) - Antarmuka Web Dashboard & Klien Tiruan ECS
+## 👥 Tim Pengembang (Kelas 3 RPLK)
+- **Satria Alba Pramasha** - Kriptografi Pascakuantum (ML-DSA) & Kepatuhan FIPS 204
+- **Raditya** - Backend Service Golang, PKI Sub-CA & Infrastruktur API
+- **Sulthan Aidhan Afiq Sukarto** - Antarmuka Web Portal, Visualizer & Integrasi Klien
 
 ---
 
@@ -20,8 +20,8 @@ Tersedia **2 Antarmuka Web Terpisah**:
 
 | Antarmuka | URL Akses | Sasaran Pengguna | Fokus Konten yang Ditampilkan |
 |---|---|---|---|
-| **Web Siap Produksi** | [http://localhost:8080](http://localhost:8080) | Pejabat, ASN, Masyarakat, Aplikasi Instansi | • Layanan penandatanganan dokumen resmi (PDF/Teks)<br>• Tanda terima resmi TTE BSrE & Segel Elektronik<br>• Portal verifikasi keabsahan publik (Status Hijau/Merah)<br>• Buku registrasi dokumen instansi |
-| **Web Visualisasi Proses** | [http://localhost:8081](http://localhost:8081) atau [http://localhost:8080/process](http://localhost:8080/process) | Peneliti, Katim Dev BSrE, Penguji Akademik | • 6-Step Visualizer Alur Sign FIPS 204 (Pre-hash, ExpandA, Masking, Fiat-Shamir, Rejection, Packing)<br>• 5-Step Visualizer Alur Verify & pinpoint kegagalan tampering<br>• Anatomi 3.309 byte signature (c, z, h)<br>• Dasbor benchmark performa & 18 uji ACVP |
+| **Web Siap Produksi** | [http://localhost:8080](http://localhost:8080) | Pejabat, ASN, Masyarakat, Aplikasi Instansi | • Layanan penandatanganan dokumen resmi (PDF/Teks)<br>• Tanda terima resmi TTE ARSign & Segel Elektronik<br>• Portal verifikasi keabsahan publik (Status Hijau/Merah)<br>• Buku registrasi dokumen instansi |
+| **Web Visualisasi Proses** | [http://localhost:8081](http://localhost:8081) atau [http://localhost:8080/process](http://localhost:8080/process) | Peneliti, Dosen / Penguji Akademik, Penguji Akademik | • 6-Step Visualizer Alur Sign FIPS 204 (Pre-hash, ExpandA, Masking, Fiat-Shamir, Rejection, Packing)<br>• 5-Step Visualizer Alur Verify & pinpoint kegagalan tampering<br>• Anatomi 3.309 byte signature (c, z, h)<br>• Dasbor benchmark performa & 18 uji ACVP |
 
 > *Kedua web dilengkapi tombol toggle switcher di bagian header atas untuk berpindah mode secara instan.*
 
@@ -30,7 +30,7 @@ Tersedia **2 Antarmuka Web Terpisah**:
 ## 📌 Ringkasan Implementasi Sesuai PRD & Analisis Kebutuhan
 1. **Algoritma Pascakuantum (PQC)**:
    - **ML-DSA-44** (NIST Security Category 2 / Setara SHA-256)
-   - **ML-DSA-65** (NIST Security Category 3 / Standar Rekomendasi BSrE)
+   - **ML-DSA-65** (NIST Security Category 3 / Standar Rekomendasi ARSign)
    - **ML-DSA-87** (NIST Security Category 5 / Rekomendasi Root CA)
 2. **Algoritma Pembanding (Klasik)**:
    - **RSA-2048** & **RSA-3072** (PKCS#1 v1.5 dengan digest SHA-256)
@@ -70,7 +70,7 @@ cd d:\pkl\pqc-prototype
 .\pqc-cli.exe keygen -alg ML-DSA-65
 
 # Tandatangani pesan
-.\pqc-cli.exe sign -alg ML-DSA-65 -msg "Surat Keputusan BSrE 2026"
+.\pqc-cli.exe sign -alg ML-DSA-65 -msg "Surat Keputusan ARSign 2026"
 
 # Simulasi skema transisi dual-sign (ML-DSA + RSA)
 .\pqc-cli.exe dual-sign -msg "Dokumen Bersama Transisi"

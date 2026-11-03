@@ -51,7 +51,7 @@ func RunFullBenchmark(iterations int) (*BenchmarkReport, error) {
 		iterations = 1000
 	}
 
-	testMessage := []byte("Dokumen Elektronik Transaksi Finansial dan Persuratan Resmi BSrE - Uji Kecepatan FIPS 204")
+	testMessage := []byte("Dokumen Elektronik Transaksi Finansial dan Persuratan Resmi ARSign - Uji Kecepatan FIPS 204")
 	report := &BenchmarkReport{
 		Timestamp:    time.Now().Format("2006-01-02 15:04:05 MST"),
 		Iterations:   iterations,

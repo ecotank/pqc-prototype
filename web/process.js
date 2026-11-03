@@ -5,7 +5,7 @@ createApp({
     return {
       activeTab: 'pipeline',
       selectedAlg: 'ML-DSA-65',
-      testPayload: 'Uji Komputasi Internal Transformasi Matriks Lattice ML-DSA - BSrE BSSN',
+      testPayload: 'Uji Komputasi Internal Transformasi Matriks Lattice ML-DSA - ARSign (3 RPLK)',
       isTracing: false,
       traceResult: null,
       activeKey: null,

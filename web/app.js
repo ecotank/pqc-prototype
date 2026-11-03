@@ -10,7 +10,7 @@ createApp({
 
       // Signing form
       inputMode: 'text',
-      inputText: 'Surat Keputusan Elektronik Balai Besar Sertifikasi Elektronik Nomor: 042/BSRE/PQC/2026',
+      inputText: 'Surat Keputusan Elektronik ARSign Nomor: 042/ARS/PQC/2026',
       calculatedDigest: '',
       uploadedFileName: '',
       uploadedFileSize: 0,
@@ -157,7 +157,7 @@ createApp({
       try {
         let endpoint = '/api/v1/sign';
         let payload = {
-          signer_id: 'rplk2-bsre-signer',
+          signer_id: 'rplk-arsign-signer',
           algorithm: this.selectedAlgorithm,
           digest: this.calculatedDigest,
           private_key: this.activeKey.private_key_hex,
@@ -381,7 +381,7 @@ createApp({
       }
       if (!this.auditLogs || this.auditLogs.length === 0) {
         this.auditLogs = [
-          { timestamp: '2026-10-29 08:30:12', event: 'STANDALONE_INIT', status: 'SUCCESS', details: 'Inisialisasi lingkungan PQC standalone BSrE' },
+          { timestamp: '2026-10-29 08:30:12', event: 'STANDALONE_INIT', status: 'SUCCESS', details: 'Inisialisasi lingkungan PQC standalone ARSign' },
           { timestamp: '2026-10-29 08:30:15', event: 'KEYGEN_MLDSA65', status: 'SUCCESS', details: 'Pembangkitan pasangan kunci FIPS 204 ML-DSA-65' }
         ];
       }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Purwarupa Penandatanganan Digital ML-DSA (FIPS 204) - BSrE BSSN</title>
+  <title>Laboratorium Penandatanganan Digital ML-DSA (FIPS 204) - ARSign</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -13,7 +13,7 @@
       theme: {
         extend: {
           colors: {
-            bsre: {
+            arsign: {
               50: '#f0f7ff',
               100: '#e0effe',
               500: '#0066cc',
@@ -61,7 +61,7 @@
               <span class="font-bold text-slate-100 text-base">PQC Digital Signature POC</span>
               <span class="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">FIPS 204 Compliant</span>
             </div>
-            <p class="text-xs text-slate-400">Balai Besar Sertifikasi Elektronik (BSrE) - BSSN RI</p>
+            <p class="text-xs text-slate-400">ARSign Trust Network — Tim 3 RPLK: Alba, Radit, Sulthan</p>
           </div>
         </div>
 
@@ -131,7 +131,7 @@
               <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Algoritma Aktif:</span>
               <select v-model="selectedAlgorithm" @change="onAlgorithmChange" class="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
                 <option value="ML-DSA-44">ML-DSA-44 (NIST Kategori 2)</option>
-                <option value="ML-DSA-65">ML-DSA-65 (NIST Kategori 3 - Standar BSrE)</option>
+                <option value="ML-DSA-65">ML-DSA-65 (NIST Kategori 3 - Standar ARSign)</option>
                 <option value="ML-DSA-87">ML-DSA-87 (NIST Kategori 5 - Root CA)</option>
                 <option value="RSA-2048">RSA-2048 (Pembanding Klasik)</option>
                 <option value="RSA-3072">RSA-3072 (Pembanding Klasik)</option>
@@ -564,7 +564,7 @@
 
           <!-- API Guide -->
           <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
-            <h3 class="text-sm font-bold text-white">Spesifikasi Endpoint API (Pola ECS BSrE)</h3>
+            <h3 class="text-sm font-bold text-white">Spesifikasi Endpoint API (Pola ARSign Client Service)</h3>
 
             <div class="space-y-3 text-xs">
               <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
@@ -574,7 +574,7 @@
                 </div>
                 <p class="text-slate-400">Kirim nilai hash dokumen untuk mendapatkan tanda tangan ML-DSA:</p>
                 <pre class="bg-slate-950 p-2 rounded text-[11px] text-blue-300 font-mono overflow-x-auto">{
-  "signer_id": "rplk2-bsre",
+  "signer_id": "rplk-arsign",
   "algorithm": "ML-DSA-65",
   "digest": "&lt;SHA-256-HEX&gt;",
   "format": "raw"
@@ -604,7 +604,7 @@
     <!-- Footer -->
     <footer class="border-t border-slate-800 bg-slate-950/80 px-4 py-4 text-center text-xs text-slate-500">
       <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-        <span>Purwarupa Penandatanganan Pascakuantum (PQC POC) • Kelompok RPLK 2 BSrE</span>
+        <span>Purwarupa Penandatanganan Pascakuantum (PQC POC) • Tim 3 RPLK: Alba, Radit, Sulthan</span>
         <span>Standard: NIST FIPS 204 (ML-DSA) • Latensi: =&lt; 2 Detik (Terpenuhi)</span>
       </div>
     </footer>
