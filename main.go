@@ -74,6 +74,7 @@ func main() {
 	// 4. Mux Web Siap Produksi (Port 8080)
 	muxProd := http.NewServeMux()
 	api.RegisterRoutes(muxProd, handler)
+	api.RegisterAdminRoutes(muxProd, handler)
 	muxProd.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" || r.URL.Path == "/production.html" || r.URL.Path == "/prod" {
 			data, err := readWebFile("production.html")
