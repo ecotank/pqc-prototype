@@ -1,6 +1,6 @@
 const { createApp } = Vue;
 
-createApp({
+const app = createApp({
   data() {
     return {
       // 1. Theme & Navigation
@@ -171,6 +171,14 @@ createApp({
       return 'U';
     },
 
+    activeSpecimenName() {
+      if (!Array.isArray(this.userSpecimens) || !this.selectedSpecimenId) {
+        return 'Spesimen Terpasang';
+      }
+      const found = this.userSpecimens.find(s => s && s.id === this.selectedSpecimenId);
+      return found ? found.name : 'Spesimen Terpasang';
+    },
+
     filteredRegistry() {
       if (!this.historySearch) return this.registryList;
       const q = this.historySearch.toLowerCase();
@@ -308,7 +316,22 @@ createApp({
         role: this.currentUser.role || 'PUBLIC'
       };
       if (this.currentUser.specimen_signature) {
-        this.specimenImage = this.currentUser.specimen_signature;
+        const raw = (this.currentUser.specimen_signature || '').trim();
+        if (raw.startsWith('[')) {
+          try {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr) && arr.length > 0) {
+              this.userSpecimens = arr;
+              const def = arr.find(s => s && s.is_default) || arr[0];
+              this.selectedSpecimenId = def ? def.id : '';
+              this.specimenImage = def ? def.data_url : null;
+            }
+          } catch (e) {
+            console.warn('Gagal parse JSON spesimen:', e);
+          }
+        } else if (raw.startsWith('data:image')) {
+          this.specimenImage = raw;
+        }
       }
     },
 
@@ -888,7 +911,11 @@ createApp({
     async saveUserSpecimensToServer() {
       if (!this.currentUser) return;
       const username = this.currentUser.username;
-      localStorage.setItem(`arsign_specimens_${username}`, JSON.stringify(this.userSpecimens));
+      try {
+        localStorage.setItem(`arsign_specimens_${username}`, JSON.stringify(this.userSpecimens));
+      } catch (storageErr) {
+        console.warn('LocalStorage limit reached for specimens:', storageErr);
+      }
 
       try {
         await fetch('/api/v1/user/specimens', {
@@ -904,8 +931,50 @@ createApp({
       }
     },
 
+    optimizeSpecimenDataUrl(srcDataUrl) {
+      return new Promise((resolve) => {
+        if (!srcDataUrl || !srcDataUrl.startsWith('data:image')) {
+          resolve(srcDataUrl);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxW = 600;
+            const maxH = 260;
+            let w = img.width || 400;
+            let h = img.height || 200;
+
+            if (w > maxW || h > maxH) {
+              const ratio = Math.min(maxW / w, maxH / h);
+              w = Math.round(w * ratio);
+              h = Math.round(h * ratio);
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(10, w);
+            canvas.height = Math.max(10, h);
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/png'));
+          } catch (e) {
+            resolve(srcDataUrl);
+          }
+        };
+        img.onerror = () => {
+          resolve(srcDataUrl);
+        };
+        img.src = srcDataUrl;
+      });
+    },
+
     async addSpecimen(name, dataUrl) {
       if (!dataUrl) return;
+      if (!Array.isArray(this.userSpecimens)) {
+        this.userSpecimens = [];
+      }
       const id = 'spec_' + Date.now();
       const specName = name ? name.trim() : `Spesimen #${this.userSpecimens.length + 1}`;
       const isFirst = this.userSpecimens.length === 0;
@@ -1024,26 +1093,33 @@ createApp({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     },
 
-    saveSpecimenFromModal() {
+    async saveSpecimenFromModal() {
       const canvas = document.getElementById('specimenDrawCanvas');
       if (!canvas) return;
-      const dataUrl = canvas.toDataURL('image/png');
-      this.addSpecimen(this.specimenUploadName || `Coretan #${this.userSpecimens.length + 1}`, dataUrl);
-      this.specimenUploadName = '';
-      this.closeSpecimenModal();
+      try {
+        const rawDataUrl = canvas.toDataURL('image/png');
+        const optimized = await this.optimizeSpecimenDataUrl(rawDataUrl);
+        const name = (this.specimenUploadName && this.specimenUploadName.trim()) || `Coretan #${(this.userSpecimens || []).length + 1}`;
+        await this.addSpecimen(name, optimized);
+        this.specimenUploadName = '';
+        this.closeSpecimenModal();
+      } catch (err) {
+        console.error('Gagal simpan coretan spesimen:', err);
+        this.showToast('Gagal memproses gambar coretan.', 'error');
+      }
     },
 
     // ==========================================
     // SPESIMEN & FILE HANDLING
     // ==========================================
     async handleSpecimenFileUpload(e) {
-      const file = e.target.files && e.target.files[0];
+      const file = e && e.target && e.target.files && e.target.files[0];
       if (!file) return;
 
       const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
 
-      if (file.type === 'application/pdf') {
-        try {
+      try {
+        if (file.type === 'application/pdf') {
           const arrayBuffer = await file.arrayBuffer();
           if (window.pdfjsLib) {
             const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -1054,21 +1130,34 @@ createApp({
             canvas.height = viewport.height;
             const ctx = canvas.getContext('2d');
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-            const dataUrl = canvas.toDataURL('image/png');
-            await this.addSpecimen(fileNameWithoutExt, dataUrl);
-            this.showToast('Halaman pertama spesimen PDF berhasil disimpan dan diterapkan.', 'success');
+            const rawDataUrl = canvas.toDataURL('image/png');
+            const optimized = await this.optimizeSpecimenDataUrl(rawDataUrl);
+            await this.addSpecimen(fileNameWithoutExt, optimized);
+            this.showToast('Halaman pertama spesimen PDF berhasil dimuat dan disimpan.', 'success');
           } else {
             this.showToast('Pustaka PDF viewer belum siap.', 'warning');
           }
-        } catch (err) {
-          this.showToast('Gagal memuat spesimen PDF: ' + err.message, 'error');
+        } else {
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            try {
+              const rawDataUrl = ev.target.result;
+              const optimized = await this.optimizeSpecimenDataUrl(rawDataUrl);
+              await this.addSpecimen(fileNameWithoutExt, optimized);
+            } catch (err) {
+              console.error('Gagal memproses gambar spesimen:', err);
+              this.showToast('Gagal memproses berkas spesimen.', 'error');
+            }
+          };
+          reader.readAsDataURL(file);
         }
-      } else {
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          await this.addSpecimen(fileNameWithoutExt, ev.target.result);
-        };
-        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error saat membaca file spesimen:', err);
+        this.showToast('Gagal memuat spesimen: ' + err.message, 'error');
+      } finally {
+        if (e && e.target) {
+          e.target.value = '';
+        }
       }
     },
 
@@ -1481,4 +1570,10 @@ createApp({
       this.showToast('Disalin ke papan klip!', 'info');
     }
   }
-}).mount('#app');
+});
+
+app.config.errorHandler = (err, vm, info) => {
+  console.error('ARSign Vue Error Caught:', err, info);
+};
+
+app.mount('#app');

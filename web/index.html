@@ -795,7 +795,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                       <div class="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {{ (userSpecimens.find(s => s.id === selectedSpecimenId) || {}).name || 'Spesimen Aktif' }}
+                        {{ activeSpecimenName }}
                       </div>
                       <div class="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
                         <span>✓</span> <span>Tersimpan di akun & siap dibubuhkan</span>
