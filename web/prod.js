@@ -90,6 +90,17 @@ createApp({
       drawLastX: 0,
       drawLastY: 0,
 
+      // Interactive Drag & Resize Stamp
+      isDraggingStamp: false,
+      isResizingStamp: false,
+      resizeDir: '',
+      dragStartMouseX: 0,
+      dragStartMouseY: 0,
+      dragStartStampX: 0,
+      dragStartStampY: 0,
+      dragStartStampW: 0,
+      dragStartStampH: 0,
+
       // 2FA OTP State
       otpSent: false,
       otpCode: '',
@@ -683,6 +694,7 @@ createApp({
     },
 
     handlePdfOverlayClick(e) {
+      if (this.isDraggingStamp || this.isResizingStamp) return;
       const overlay = this.$refs.pdfOverlay;
       if (!overlay || !this.canvasWidth || !this.canvasHeight) return;
 
@@ -703,6 +715,94 @@ createApp({
       this.specimenCustomX = Math.max(10, Math.min(this.pdfActualPageWidth - stampW - 10, pdfX - (stampW / 2)));
       this.specimenCustomY = Math.max(10, Math.min(this.pdfActualPageHeight - stampH - 10, pdfY - (stampH / 2)));
       this.specimenPage = this.pdfCurrentPage;
+    },
+
+    startStampDrag(e) {
+      if (this.isResizingStamp) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.isDraggingStamp = true;
+      this.dragStartMouseX = e.clientX;
+      this.dragStartMouseY = e.clientY;
+      this.dragStartStampX = this.specimenCustomX;
+      this.dragStartStampY = this.specimenCustomY;
+
+      window.addEventListener('mousemove', this.onStampMouseMove);
+      window.addEventListener('mouseup', this.onStampMouseUp);
+    },
+
+    startStampResize(dir, e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.isResizingStamp = true;
+      this.resizeDir = dir;
+      this.dragStartMouseX = e.clientX;
+      this.dragStartMouseY = e.clientY;
+      this.dragStartStampX = this.specimenCustomX;
+      this.dragStartStampY = this.specimenCustomY;
+      this.dragStartStampW = this.specimenWidth;
+      this.dragStartStampH = this.specimenHeight;
+
+      window.addEventListener('mousemove', this.onStampMouseMove);
+      window.addEventListener('mouseup', this.onStampMouseUp);
+    },
+
+    onStampMouseMove(e) {
+      if (!this.canvasWidth || !this.canvasHeight || !this.pdfActualPageWidth || !this.pdfActualPageHeight) return;
+
+      const scaleX = this.pdfActualPageWidth / this.canvasWidth;
+      const scaleY = this.pdfActualPageHeight / this.canvasHeight;
+
+      const deltaPdfX = (e.clientX - this.dragStartMouseX) * scaleX;
+      const deltaPdfY = -(e.clientY - this.dragStartMouseY) * scaleY;
+
+      if (this.isDraggingStamp) {
+        let newX = this.dragStartStampX + deltaPdfX;
+        let newY = this.dragStartStampY + deltaPdfY;
+
+        newX = Math.max(5, Math.min(this.pdfActualPageWidth - this.specimenWidth - 5, newX));
+        newY = Math.max(5, Math.min(this.pdfActualPageHeight - this.specimenHeight - 5, newY));
+
+        this.specimenCustomX = Math.round(newX);
+        this.specimenCustomY = Math.round(newY);
+      } else if (this.isResizingStamp) {
+        const dir = this.resizeDir;
+        let newW = this.dragStartStampW;
+        let newH = this.dragStartStampH;
+        let newX = this.dragStartStampX;
+        let newY = this.dragStartStampY;
+
+        if (dir.includes('e')) {
+          newW = Math.max(60, Math.min(this.pdfActualPageWidth - this.dragStartStampX - 5, this.dragStartStampW + deltaPdfX));
+        } else if (dir.includes('w')) {
+          const maxLeftShift = this.dragStartStampX;
+          const shift = Math.min(maxLeftShift, Math.max(-(this.dragStartStampW - 60), -deltaPdfX));
+          newX = this.dragStartStampX - shift;
+          newW = this.dragStartStampW + shift;
+        }
+
+        if (dir.includes('n')) {
+          newH = Math.max(35, Math.min(this.pdfActualPageHeight - this.dragStartStampY - 5, this.dragStartStampH + deltaPdfY));
+        } else if (dir.includes('s')) {
+          const maxBottomShift = this.dragStartStampY;
+          const shift = Math.min(maxBottomShift, Math.max(-(this.dragStartStampH - 35), -deltaPdfY));
+          newY = this.dragStartStampY - shift;
+          newH = this.dragStartStampH + shift;
+        }
+
+        this.specimenCustomX = Math.round(newX);
+        this.specimenCustomY = Math.round(newY);
+        this.specimenWidth = Math.round(newW);
+        this.specimenHeight = Math.round(newH);
+      }
+    },
+
+    onStampMouseUp() {
+      this.isDraggingStamp = false;
+      this.isResizingStamp = false;
+      this.resizeDir = '';
+      window.removeEventListener('mousemove', this.onStampMouseMove);
+      window.removeEventListener('mouseup', this.onStampMouseUp);
     },
 
     getSpecimenBoxStyle() {
@@ -1032,12 +1132,12 @@ createApp({
       this.showSuccessModal = false;
 
       this.activeTab = 'verify';
-      this.verifyInputMode = 'file';
       this.verifyFileName = targetName;
       this.verifyFile = new File([targetBlob], targetName, { type: 'application/pdf' });
+      this.verifyStatus = null;
 
       this.$nextTick(() => {
-        this.verifyDocument();
+        this.executeVerify();
       });
     },
 
@@ -1047,17 +1147,14 @@ createApp({
     async handleVerifyFileUpload(e) {
       const file = e.target.files[0];
       if (!file) return;
+      this.verifyFile = file;
       this.verifyFileName = file.name;
-
-      const arrayBuf = await file.arrayBuffer();
-      const hashBuf = await crypto.subtle.digest('SHA-256', arrayBuf);
-      this.verifyDocumentHash = Array.from(new Uint8Array(hashBuf))
-        .map(b => b.toString(16).padStart(2, '0')).join('');
+      this.verifyStatus = null;
     },
 
     async executeVerify() {
-      if (!this.verifyDocumentHash && !this.verifySignature) {
-        this.showToast('Unggah berkas PDF atau masukkan Signature Hex untuk diverifikasi.', 'warning');
+      if (!this.verifyFile) {
+        this.showToast('Silakan unggah berkas PDF untuk diverifikasi.', 'warning');
         return;
       }
 
@@ -1065,55 +1162,51 @@ createApp({
       this.verifyStatus = null;
 
       try {
-        // Cari di registry SQLite berdasarkan hash
-        await this.loadUserRegistry();
-        const found = this.registryList.find(r => r.document_hash.toLowerCase() === this.verifyDocumentHash.toLowerCase()) ||
-                      this.registryList.find(r => this.verifySignature && r.signature_hex.startsWith(this.verifySignature.substring(0, 40)));
+        const arrayBuf = await this.verifyFile.arrayBuffer();
+        let binary = '';
+        const bytes = new Uint8Array(arrayBuf);
+        const len = bytes.byteLength;
+        const chunkSize = 8192;
+        for (let i = 0; i < len; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunkSize, len)));
+        }
+        const base64Data = btoa(binary);
 
-        if (found) {
-          this.verifyStatus = {
-            isValid: true,
-            signer: found.signer,
-            algorithm: found.algorithm,
-            time: found.time_str,
-            hash: found.document_hash,
-            receiptId: found.id,
-            caName: 'ARSign Trust Network (Pascakuantum Ready)',
-            chainValid: true
-          };
-          this.showToast('Tanda Tangan Elektronik TERVERIFIKASI SAH!', 'success');
-        } else {
-          // Lakukan verifikasi via backend endpoint
-          const res = await fetch('/api/v1/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              algorithm: 'ML-DSA-65',
-              public_key: this.currentUser ? this.currentUser.mldsa_public_key : '',
-              data: this.verifyDocumentHash || 'sample_document',
-              signature: this.verifySignature || '00'
-            })
-          });
-          const json = await res.json();
-          if (res.ok && json.data && json.data.is_valid) {
+        const res = await fetch('/api/v1/pades/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pdf_base64: base64Data })
+        });
+        const json = await res.json();
+
+        if (res.ok && json.status === 'SUCCESS' && json.data) {
+          const d = json.data;
+          if (d.is_valid) {
             this.verifyStatus = {
               isValid: true,
-              signer: this.currentUser ? this.currentUser.fullname : 'Penanda Tangan Sah',
-              algorithm: 'Tersertifikasi Sah',
-              time: new Date().toLocaleString('id-ID'),
-              hash: this.verifyDocumentHash,
-              receiptId: 'ARS-VERIFIED',
-              caName: 'ARSign Trust Network',
-              chainValid: true
+              signer: d.signer_fullname || d.signer_name || 'Penanda Tangan Sah',
+              time: d.signed_at || d.signing_time || new Date().toLocaleString('id-ID'),
+              statusMessage: d.integrity_status || d.status_message || d.message || 'Dokumen Asli & Utuh — Belum pernah diubah atau dimodifikasi sejak ditandatangani.',
+              receiptId: d.receipt_id || 'ARS-VERIFIED',
+              caName: d.cert_issuer || 'ARSign Sub-CA Pelayanan TTE Pascakuantum',
+              institution: d.institution || 'ARSign Trust Network',
+              hasPqc: d.has_pqc,
+              pqcValid: d.pqc_valid
             };
-            this.showToast('Tanda Tangan Elektronik TERVERIFIKASI SAH!', 'success');
+            this.showToast('Dokumen ASLI & Tanda Tangan Elektronik TERVERIFIKASI SAH!', 'success');
           } else {
             this.verifyStatus = {
               isValid: false,
-              message: 'Tanda tangan tidak valid atau berkas telah mengalami modifikasi setelah penandatanganan.'
+              message: d.integrity_status || d.status_message || d.message || 'Dokumen telah mengalami perubahan atau manipulasi setelah ditandatangani.'
             };
-            this.showToast('Verifikasi gagal: Berkas tidak sah atau telah dimodifikasi.', 'error');
+            this.showToast('Verifikasi gagal: Berkas telah mengalami modifikasi atau tidak valid.', 'error');
           }
+        } else {
+          this.verifyStatus = {
+            isValid: false,
+            message: json.message || 'Berkas tidak memiliki struktur tanda tangan elektronik resmi (PAdES).'
+          };
+          this.showToast(json.message || 'Verifikasi gagal: Berkas bukan dokumen bertanda tangan resmi.', 'error');
         }
       } catch (err) {
         this.verifyStatus = {

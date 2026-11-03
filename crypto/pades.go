@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -452,4 +453,247 @@ func findMaxObjectID(pdf []byte) int {
 		}
 	}
 	return maxID
+}
+
+type PAdESVerifyDetail struct {
+	IsValid          bool   `json:"is_valid"`
+	SignerFullName   string `json:"signer_fullname"`
+	SignerEmail      string `json:"signer_email"`
+	Institution      string `json:"institution"`
+	ReceiptID        string `json:"receipt_id"`
+	SignedAt         string `json:"signed_at"`
+	CertSerialNumber string `json:"cert_serial_number"`
+	CertIssuer       string `json:"cert_issuer"`
+	IsChainValid     bool   `json:"is_chain_valid"`
+	IsRevoked        bool   `json:"is_revoked"`
+	IntegrityStatus  string `json:"integrity_status"`
+	DocumentHash     string `json:"document_hash"`
+	Message          string `json:"message"`
+}
+
+// VerifyPDFPAdES memverifikasi keaslian dan integritas tanda tangan PAdES ISO 32000-1 pada dokumen PDF
+func VerifyPDFPAdES(pdfData []byte) (*PAdESVerifyDetail, error) {
+	// 1. Cari /ByteRange terakhir
+	brRegex := regexp.MustCompile(`/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]`)
+	matches := brRegex.FindAllSubmatchIndex(pdfData, -1)
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("tidak ditemukan struktur tanda tangan elektronik PAdES (/ByteRange) pada berkas")
+	}
+
+	lastMatch := matches[len(matches)-1]
+	brStr := string(pdfData[lastMatch[0]:lastMatch[1]])
+	submatches := brRegex.FindStringSubmatch(brStr)
+	if len(submatches) < 5 {
+		return nil, fmt.Errorf("format /ByteRange tanda tangan tidak valid")
+	}
+
+	o0, _ := strconv.Atoi(submatches[1])
+	l0, _ := strconv.Atoi(submatches[2])
+	o1, _ := strconv.Atoi(submatches[3])
+	l1, _ := strconv.Atoi(submatches[4])
+
+	if o0 != 0 || l0 <= 0 || o1 <= l0 || l1 <= 0 || (o1+l1) > len(pdfData) {
+		return nil, fmt.Errorf("parameter offset /ByteRange (%d, %d, %d, %d) melebihi ukuran berkas PDF (%d)", o0, l0, o1, l1, len(pdfData))
+	}
+
+	// 2. Hitung digest aktual ByteRange dokumen
+	h := sha256.New()
+	h.Write(pdfData[o0 : o0+l0])
+	h.Write(pdfData[o1 : o1+l1])
+	actualDigest := h.Sum(nil)
+	actualDigestHex := hex.EncodeToString(actualDigest)
+
+	// 3. Ekstraksi hex PKCS#7 di antara l0 dan o1
+	contentsSlice := pdfData[l0:o1]
+	rawHex := strings.Trim(string(contentsSlice), "<> \r\n\t")
+	// Hilangkan trailing zeros yang merupakan padding alokasi PDF
+	rawHex = strings.TrimRight(rawHex, "0")
+	if len(rawHex)%2 != 0 {
+		rawHex += "0"
+	}
+
+	pkcs7Bytes, err := hex.DecodeString(rawHex)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membaca kontainer PKCS#7 /Contents: %w", err)
+	}
+
+	// 4. Unmarshal PKCS#7 ContentInfo & SignedData
+	var ci ContentInfo
+	if _, err := asn1.Unmarshal(pkcs7Bytes, &ci); err != nil {
+		return nil, fmt.Errorf("gagal parse struktur ASN.1 ContentInfo: %w", err)
+	}
+
+	var sd SignedData
+	if _, err := asn1.Unmarshal(ci.Content.Bytes, &sd); err != nil {
+		return nil, fmt.Errorf("gagal parse struktur ASN.1 SignedData: %w", err)
+	}
+
+	if len(sd.SignerInfos) == 0 {
+		return nil, fmt.Errorf("SignedData tidak memuat SignerInfo")
+	}
+
+	// 5. Parse Sertifikat di dalam SignedData
+	certs, err := x509.ParseCertificates(sd.Certificates.Bytes)
+	if err != nil || len(certs) == 0 {
+		return nil, fmt.Errorf("gagal mengekstrak sertifikat digital penanda tangan: %v", err)
+	}
+
+	var signerCert *x509.Certificate
+	si := sd.SignerInfos[0]
+	for _, c := range certs {
+		if c.SerialNumber.Cmp(si.IssuerAndSerial.SerialNumber) == 0 {
+			signerCert = c
+			break
+		}
+	}
+	if signerCert == nil {
+		signerCert = certs[0]
+	}
+
+	// 6. Ekstraksi Digest Dokumen, Waktu TTE, dan Metadata PQC dari PKCS#7
+	var embeddedDigest []byte
+	mdOidBytes := []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x04}
+	idxMD := bytes.Index(pkcs7Bytes, mdOidBytes)
+	if idxMD != -1 && idxMD+len(mdOidBytes)+40 <= len(pkcs7Bytes) {
+		start := idxMD + len(mdOidBytes)
+		octIdx := bytes.IndexByte(pkcs7Bytes[start:start+10], 0x04)
+		if octIdx != -1 {
+			digStart := start + octIdx + 2
+			if digStart+32 <= len(pkcs7Bytes) {
+				embeddedDigest = pkcs7Bytes[digStart : digStart+32]
+			}
+		}
+	}
+
+	var signingTime time.Time
+	timeOidBytes := []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x05}
+	idxTime := bytes.Index(pkcs7Bytes, timeOidBytes)
+	if idxTime != -1 && idxTime+40 <= len(pkcs7Bytes) {
+		slice := pkcs7Bytes[idxTime : idxTime+40]
+		if tPos := bytes.IndexByte(slice, 0x17); tPos != -1 && tPos+15 < len(slice) {
+			tLen := int(slice[tPos+1])
+			if tPos+2+tLen <= len(slice) {
+				tBytes := slice[tPos+2 : tPos+2+tLen]
+				signingTime, _ = time.Parse("060102150405Z", string(tBytes))
+			}
+		}
+	}
+
+	var receiptID, mldsaPubKeyHex, mldsaSigHex string
+	pqcOidBytes := []byte{0x2b, 0x06, 0x01, 0x04, 0x01, 0x83, 0xc7, 0x5d, 0x01, 0x81, 0x4c}
+	idxPQC := bytes.Index(pkcs7Bytes, pqcOidBytes)
+	if idxPQC != -1 {
+		rawStr := string(pkcs7Bytes[idxPQC:])
+		if rIdx := strings.Index(rawStr, "ML-DSA-65|RECEIPT:"); rIdx != -1 {
+			endStr := strings.IndexByte(rawStr[rIdx:], 0x00)
+			if endStr == -1 {
+				endStr = len(rawStr[rIdx:])
+			}
+			pqcPayload := rawStr[rIdx : rIdx+endStr]
+			parts := strings.Split(pqcPayload, "|")
+			for _, p := range parts {
+				if strings.HasPrefix(p, "RECEIPT:") {
+					receiptID = strings.TrimPrefix(p, "RECEIPT:")
+				} else if strings.HasPrefix(p, "PUB:") {
+					mldsaPubKeyHex = strings.TrimPrefix(p, "PUB:")
+				} else if strings.HasPrefix(p, "SIG:") {
+					mldsaSigHex = strings.TrimPrefix(p, "SIG:")
+				}
+			}
+		}
+	}
+
+	// 7. Validasi Integritas Dokumen (ByteRange hash vs embedded digest)
+	digestMatch := len(embeddedDigest) == 32 && bytes.Equal(actualDigest, embeddedDigest)
+
+	// 8. Validasi Signature RSA pada AuthAttributes
+	rsaValid := false
+	if len(si.AuthAttributes.FullBytes) > 0 {
+		attrsForVerify := make([]byte, len(si.AuthAttributes.FullBytes))
+		copy(attrsForVerify, si.AuthAttributes.FullBytes)
+		attrsForVerify[0] = 0x31 // SET OF tag
+		hAttrs := sha256.Sum256(attrsForVerify)
+		if rsaPub, ok := signerCert.PublicKey.(*rsa.PublicKey); ok {
+			if err := rsa.VerifyPKCS1v15(rsaPub, crypto.SHA256, hAttrs[:], si.Signature); err == nil {
+				rsaValid = true
+			}
+		}
+	}
+
+	// 9. Validasi Rantai Sertifikat (Chain)
+	chainValid := true
+	ca, caErr := GetARSignAuthority()
+	if caErr == nil && ca != nil {
+		roots := x509.NewCertPool()
+		roots.AddCert(ca.RootCert)
+		intermediates := x509.NewCertPool()
+		intermediates.AddCert(ca.SubCACert)
+
+		opts := x509.VerifyOptions{
+			Roots:         roots,
+			Intermediates: intermediates,
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		}
+		if _, err := signerCert.Verify(opts); err != nil {
+			chainValid = false
+		}
+	}
+
+	// 10. Jika ada tanda tangan pascakuantum ML-DSA, verifikasi juga
+	pqcValid := true
+	if mldsaPubKeyHex != "" && mldsaSigHex != "" {
+		pubBytes, pErr := hex.DecodeString(mldsaPubKeyHex)
+		sigBytes, sErr := hex.DecodeString(mldsaSigHex)
+		if pErr == nil && sErr == nil {
+			pqcRes, vErr := VerifyMLDSA("ML-DSA-65", pubBytes, actualDigest, sigBytes)
+			if vErr != nil || !pqcRes.Valid {
+				pqcValid = false
+			}
+		}
+	}
+
+	timeStr := signingTime.Format("02-01-2006 15:04:05")
+	if signingTime.IsZero() {
+		timeStr = signerCert.NotBefore.Format("02-01-2006 15:04:05")
+	}
+
+	signerName := signerCert.Subject.CommonName
+	if signerName == "" {
+		signerName = "Penanda Tangan Sah"
+	}
+	email := ""
+	if len(signerCert.EmailAddresses) > 0 {
+		email = signerCert.EmailAddresses[0]
+	}
+	inst := ""
+	if len(signerCert.Subject.Organization) > 0 {
+		inst = signerCert.Subject.Organization[0]
+	}
+
+	isValid := digestMatch && (rsaValid || pqcValid) && chainValid
+
+	msg := "Dokumen Asli & Utuh — Belum pernah diubah atau dimodifikasi sejak ditandatangani."
+	if !digestMatch {
+		msg = "DOKUMEN TIDAK VALID: Berkas telah mengalami modifikasi atau manipulasi setelah ditandatangani!"
+	} else if !rsaValid && !pqcValid {
+		msg = "DOKUMEN TIDAK VALID: Tanda tangan digital kriptografis tidak cocok."
+	} else if !chainValid {
+		msg = "DOKUMEN PERINGATAN: Rantai sertifikat digital penerbit tidak dapat diverifikasi."
+	}
+
+	return &PAdESVerifyDetail{
+		IsValid:          isValid,
+		SignerFullName:   signerName,
+		SignerEmail:      email,
+		Institution:      inst,
+		ReceiptID:        receiptID,
+		SignedAt:         timeStr,
+		CertSerialNumber: signerCert.SerialNumber.String(),
+		CertIssuer:       signerCert.Issuer.CommonName,
+		IsChainValid:     chainValid,
+		IsRevoked:        false,
+		IntegrityStatus:  msg,
+		DocumentHash:     actualDigestHex,
+		Message:          msg,
+	}, nil
 }

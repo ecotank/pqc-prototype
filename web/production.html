@@ -777,31 +777,18 @@
                   </div>
                 </div>
 
-                <!-- Penyesuaian Ukuran & Letak Stempel -->
+                <!-- Penempatan & Halaman Target -->
                 <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
                   <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                    <span>Posisi & Ukuran Stempel</span>
-                    <span class="text-[10px] text-blue-600 dark:text-blue-400 font-mono">X:{{ specimenCustomX }}, Y:{{ specimenCustomY }}</span>
+                    <span>Halaman Target TTE</span>
+                    <select v-model.number="specimenPage" class="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-semibold">
+                      <option v-for="p in pdfTotalPages" :key="p" :value="p">Halaman {{ p }}</option>
+                    </select>
                   </div>
-                  <div class="grid grid-cols-3 gap-2 text-[11px]">
-                    <div>
-                      <span class="text-[10px] text-slate-400 block mb-0.5">Lebar (px)</span>
-                      <input v-model.number="specimenWidth" type="number" min="100" max="400"
-                             class="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-mono">
-                    </div>
-                    <div>
-                      <span class="text-[10px] text-slate-400 block mb-0.5">Tinggi (px)</span>
-                      <input v-model.number="specimenHeight" type="number" min="50" max="300"
-                             class="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-mono">
-                    </div>
-                    <div>
-                      <span class="text-[10px] text-slate-400 block mb-0.5">Halaman</span>
-                      <select v-model.number="specimenPage" class="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-center font-mono">
-                        <option v-for="p in pdfTotalPages" :key="p" :value="p">Hal {{ p }}</option>
-                      </select>
-                    </div>
+                  <div class="flex items-center gap-2 p-2 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 text-[11px] text-blue-700 dark:text-blue-300 leading-tight">
+                    <span>✨</span>
+                    <span>Tarik stempel untuk menggeser letak, atau seret titik sisi/sudut pada preview dokumen untuk menyesuaikan ukuran.</span>
                   </div>
-                  <p class="text-[10px] text-slate-500 italic">💡 Tips: Klik langsung pada preview lembar dokumen PDF untuk menggeser letak stempel secara presisi.</p>
                 </div>
               </div>
 
@@ -878,22 +865,45 @@
                   
                   <!-- Signature Stamp Target Indicator (Visible only if tteMode === 'visible') -->
                   <div v-if="tteMode === 'visible'"
-                       class="absolute border-2 border-dashed border-blue-500 bg-blue-500/10 rounded-lg flex flex-col justify-between p-2 shadow-sm pointer-events-none transition-all duration-75"
-                       :style="getSpecimenBoxStyle()">
-                    <div class="flex items-center justify-between text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-white/90 dark:bg-slate-900/90 px-1 py-0.5 rounded">
-                      <span>Stempel ARSign TTE</span>
-                      <span>Hal {{ specimenPage }}</span>
-                    </div>
+                       class="absolute border-2 border-dashed border-blue-500 rounded-lg flex flex-col justify-between shadow-md transition-shadow group select-none"
+                       :class="[
+                         specimenSource === 'file' && specimenImage ? 'bg-transparent hover:bg-blue-500/10' : 'bg-blue-500/10 p-2',
+                         isDraggingStamp ? 'cursor-grabbing shadow-lg border-blue-600' : 'cursor-grab hover:border-blue-600'
+                       ]"
+                       :style="getSpecimenBoxStyle()"
+                       @mousedown="startStampDrag">
+                    
+                    <!-- 8 Resize Handles (Sisi dan Sudut) -->
+                    <!-- Sudut NW -->
+                    <div @mousedown.stop="startStampResize('nw', $event)" class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-nwse-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Tepi Atas N -->
+                    <div @mousedown.stop="startStampResize('n', $event)" class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-ns-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Sudut NE -->
+                    <div @mousedown.stop="startStampResize('ne', $event)" class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-nesw-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Tepi Kanan E -->
+                    <div @mousedown.stop="startStampResize('e', $event)" class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-ew-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Sudut SE -->
+                    <div @mousedown.stop="startStampResize('se', $event)" class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-nwse-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Tepi Bawah S -->
+                    <div @mousedown.stop="startStampResize('s', $event)" class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-ns-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Sudut SW -->
+                    <div @mousedown.stop="startStampResize('sw', $event)" class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-nesw-resize hover:scale-125 z-30 transition-transform"></div>
+                    <!-- Tepi Kiri W -->
+                    <div @mousedown.stop="startStampResize('w', $event)" class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-full cursor-ew-resize hover:scale-125 z-30 transition-transform"></div>
 
                     <!-- Mode File (Gambar / PDF) -->
-                    <div v-if="specimenSource === 'file'" class="flex items-center justify-center flex-1 overflow-hidden my-1">
-                      <img v-if="specimenImage" :src="specimenImage" class="max-h-full max-w-full object-contain opacity-85">
-                      <span v-else class="text-[9px] text-blue-700 dark:text-blue-300 font-semibold">[Area Spesimen File]</span>
+                    <div v-if="specimenSource === 'file'" class="w-full h-full flex items-center justify-center overflow-hidden p-1">
+                      <img v-if="specimenImage" :src="specimenImage" class="max-h-full max-w-full object-contain pointer-events-none">
+                      <div v-else class="text-center p-2">
+                        <span class="text-xs">🖋️</span>
+                        <div class="text-[9px] text-blue-700 dark:text-blue-300 font-semibold">[Area Spesimen Tanda Tangan]</div>
+                        <div class="text-[8px] text-slate-500">Unggah berkas atau buat coretan</div>
+                      </div>
                     </div>
 
                     <!-- Mode QR Code + Nama di Bawah QR Code -->
-                    <div v-else class="flex flex-col items-center justify-center flex-1 my-1">
-                      <div class="w-7 h-7 rounded bg-blue-900 text-white text-[9px] font-bold flex items-center justify-center shadow-xs mb-1">
+                    <div v-else class="flex flex-col items-center justify-center flex-1 my-1 pointer-events-none">
+                      <div class="w-8 h-8 rounded bg-blue-900 text-white text-[9px] font-bold flex items-center justify-center shadow-xs mb-1">
                         📱 QR
                       </div>
                       <div class="text-[8px] font-bold text-blue-950 dark:text-blue-200 text-center leading-tight">
@@ -904,8 +914,9 @@
                       </div>
                     </div>
 
-                    <div class="text-[8px] text-slate-500 text-center font-mono bg-white/80 dark:bg-slate-900/80 rounded px-1">
-                      X:{{ specimenCustomX }}, Y:{{ specimenCustomY }}
+                    <!-- Badge status kecil di pojok -->
+                    <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-900/80 text-white text-[8px] font-mono pointer-events-none whitespace-nowrap">
+                      Hal {{ specimenPage }} • {{ specimenWidth }}×{{ specimenHeight }}
                     </div>
                   </div>
 
@@ -926,54 +937,40 @@
         <!-- ------------------------------------------------------------- -->
         <section v-if="activeTab === 'verify'" class="h-full grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 overflow-hidden">
           
-          <!-- LEFT CARD: INPUT BERKAS / SIGNATURE -->
+          <!-- LEFT CARD: UNGGAH BERKAS PDF HASIL TTE -->
           <div class="lg:col-span-5 flex flex-col justify-between h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
             <div>
               <div class="pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
                 <h2 class="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <span>🔍</span> <span>Verifikasi Keabsahan Dokumen TTE</span>
                 </h2>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">Validasi integritas kriptografis dan rantai sertifikat ARSign Sub-CA & Root CA</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Validasi keaslian dokumen PAdES dan integritas tanda tangan elektronik tersertifikasi</p>
               </div>
 
-              <!-- Mode Input Switch -->
-              <div class="flex rounded-xl bg-slate-100 dark:bg-slate-950 p-1 mb-4 border border-slate-200 dark:border-slate-800">
-                <button type="button" @click="verifyInputMode = 'file'" class="flex-1 py-1.5 text-xs font-bold rounded-lg transition"
-                        :class="verifyInputMode === 'file' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500'">
-                  Unggah Berkas PDF
-                </button>
-                <button type="button" @click="verifyInputMode = 'text'" class="flex-1 py-1.5 text-xs font-bold rounded-lg transition"
-                        :class="verifyInputMode === 'text' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500'">
-                  Tempel Signature Hex
-                </button>
-              </div>
-
-              <!-- Upload File Option -->
-              <div v-if="verifyInputMode === 'file'" class="space-y-3">
-                <label class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 rounded-2xl cursor-pointer bg-slate-50 dark:bg-slate-950 transition">
-                  <span class="text-2xl mb-2">📁</span>
-                  <span class="text-xs font-bold text-slate-700 dark:text-slate-300">{{ verifyFileName || 'Pilih Berkas PDF Hasil TTE' }}</span>
-                  <span class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Sistem otomatis menghitung hash SHA-512 dan memeriksa tanda tangan</span>
+              <!-- Upload File Area -->
+              <div class="space-y-3">
+                <label class="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 rounded-2xl cursor-pointer bg-slate-50 dark:bg-slate-950 transition group">
+                  <span class="text-3xl mb-2 group-hover:scale-110 transition-transform">📁</span>
+                  <span class="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">{{ verifyFileName || 'Pilih Berkas PDF untuk Diverifikasi' }}</span>
+                  <span class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 text-center">Klik atau seret file PDF bertanda tangan ke sini</span>
                   <input type="file" accept="application/pdf" @change="handleVerifyFileUpload" class="hidden">
                 </label>
-                <div v-if="verifyDocumentHash" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[10px] font-mono break-all text-slate-600 dark:text-slate-400">
-                  <span class="font-bold text-slate-700 dark:text-slate-300">Hash SHA-256:</span> {{ verifyDocumentHash }}
-                </div>
-              </div>
 
-              <!-- Paste Signature Option -->
-              <div v-if="verifyInputMode === 'text'" class="space-y-2">
-                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Signature Hex / Token TTE</label>
-                <textarea v-model="verifySignature" rows="6" placeholder="Tempel kode hex tanda tangan elektronik di sini..."
-                          class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-mono text-[11px] focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                <div v-if="verifyFile" class="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-xs text-blue-700 dark:text-blue-300 flex items-center justify-between">
+                  <div class="flex items-center gap-2 truncate">
+                    <span>📄</span>
+                    <span class="font-semibold truncate">{{ verifyFileName }}</span>
+                  </div>
+                  <span class="text-[10px] font-mono shrink-0">{{ (verifyFile.size / 1024).toFixed(1) }} KB</span>
+                </div>
               </div>
             </div>
 
             <!-- Verify Action Button -->
-            <button type="button" @click="executeVerify" :disabled="isVerifying"
+            <button type="button" @click="executeVerify" :disabled="isVerifying || !verifyFile"
                     class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
               <span v-if="isVerifying" class="animate-spin text-sm">⏳</span>
-              <span>{{ isVerifying ? 'Memvalidasi Kriptografi...' : 'Verifikasi Validitas TTE Sekarang' }}</span>
+              <span>{{ isVerifying ? 'Memeriksa Integritas Dokumen...' : 'Verifikasi Keabsahan Dokumen' }}</span>
             </button>
           </div>
 
@@ -986,53 +983,53 @@
               </div>
 
               <!-- Status Banner -->
-              <div v-if="!verifyStatus" class="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-center">
+              <div v-if="!verifyStatus" class="p-8 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-center">
                 <span class="text-3xl">🛡️</span>
                 <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 mt-2">Menunggu Berkas Verifikasi</h4>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Unggah berkas di sisi kiri untuk memverifikasi keaslian dan integritas dokumen secara otomatis.</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Unggah berkas PDF di sisi kiri untuk memverifikasi keaslian dan integritas dokumen secara otomatis.</p>
               </div>
 
-              <div v-else-if="verifyStatus.isValid" class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 space-y-3">
+              <div v-else-if="verifyStatus.isValid" class="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 space-y-3">
                 <div class="flex items-center gap-2 font-extrabold text-sm text-emerald-700 dark:text-emerald-400">
-                  <span class="text-lg">✓</span> <span>TTE RESMI TERVERIFIKASI SAH</span>
+                  <span class="text-lg">✓</span> <span>DOKUMEN ASLI & TERVERIFIKASI SAH</span>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-xs">
+                <p class="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed font-medium">
+                  {{ verifyStatus.statusMessage || 'Dokumen Asli & Utuh — Belum pernah diubah atau dimodifikasi sejak ditandatangani.' }}
+                </p>
+                <div class="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-emerald-200 dark:border-emerald-900/60">
                   <div>
                     <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Penanda Tangan</span>
                     <strong class="text-slate-900 dark:text-white">{{ verifyStatus.signer }}</strong>
                   </div>
                   <div>
-                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Status Keabsahan</span>
-                    <strong class="text-emerald-600 dark:text-emerald-400">Tersertifikasi Sah</strong>
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Status Integritas</span>
+                    <strong class="text-emerald-600 dark:text-emerald-400">Tersertifikasi Sah & Utuh</strong>
                   </div>
                   <div>
                     <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Waktu Penandatanganan</span>
                     <span>{{ verifyStatus.time }}</span>
                   </div>
                   <div>
-                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">ID Registrasi</span>
-                    <span class="font-mono text-blue-600 dark:text-blue-400">{{ verifyStatus.receiptId }}</span>
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Otoritas Validasi</span>
+                    <span class="font-medium text-slate-700 dark:text-slate-300">{{ verifyStatus.caName }}</span>
                   </div>
-                </div>
-                <div class="pt-2 border-t border-emerald-200 dark:border-emerald-900/60 text-[11px] text-slate-600 dark:text-slate-400">
-                  Otoritas Sertifikat: <strong>{{ verifyStatus.caName }}</strong> (Rantai Sertifikat Valid).
                 </div>
               </div>
 
-              <div v-else class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-300">
+              <div v-else class="p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-300">
                 <div class="flex items-center gap-2 font-extrabold text-sm text-rose-700 dark:text-rose-400">
                   <span class="text-lg">✕</span> <span>DOKUMEN TIDAK VALID / MODIFIKASI TERDETEKSI</span>
                 </div>
-                <p class="text-xs mt-1 text-rose-600 dark:text-rose-400">{{ verifyStatus.message }}</p>
+                <p class="text-xs mt-2 text-rose-600 dark:text-rose-400 leading-relaxed font-medium">{{ verifyStatus.message }}</p>
               </div>
 
               <!-- Technical Details Card -->
               <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
-                <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300">Standar Verifikasi:</div>
+                <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300">Standar Pemeriksaan Integritas:</div>
                 <ul class="text-[10px] text-slate-500 dark:text-slate-400 space-y-1 list-disc list-inside">
-                  <li>Validasi matematis integritas digital & tanda tangan bersertifikat.</li>
-                  <li>Integritas hash dokumen dengan SHA-512 & SHA-256 (Pola ECS Anti-Tamper).</li>
-                  <li>Pemeriksaan Certificate Revocation List (CRL) ARSign Sub-CA secara real-time.</li>
+                  <li>Validasi struktur tanda tangan elektronik standar ISO 32000-1 (PAdES).</li>
+                  <li>Integritas byte dokumen secara menyeluruh (ByteRange Cryptographic Digest).</li>
+                  <li>Verifikasi matematis kriptografi anti-pemalsuan dan anti-penyangkalan.</li>
                 </ul>
               </div>
             </div>

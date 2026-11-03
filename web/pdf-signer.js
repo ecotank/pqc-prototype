@@ -115,78 +115,29 @@ window.PDFSigner = (function() {
       const fontHeader = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
       const fontBody = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-      // 5. Gambar Box Bingkai Resmi ARSign
-      targetPage.drawRectangle({
-        x: posX,
-        y: posY,
-        width: boxW,
-        height: boxH,
-        borderColor: PDFLib.rgb(0.08, 0.32, 0.72),
-        borderWidth: 1.2,
-        color: PDFLib.rgb(0.97, 0.985, 1.0)
-      });
-
-      const pad = Math.max(4, Math.min(8, boxH * 0.08));
-
       if (specimenEmbed) {
-        // Mode dengan Spesimen Gambar: QR di kiri, Spesimen di kanan atas, Nama di bawah
-        const qrSize = Math.max(26, Math.min(boxH - (pad * 2), boxW * 0.32));
-        const qrX = posX + pad;
-        const qrY = posY + (boxH - qrSize) / 2;
-
-        targetPage.drawImage(qrImage, {
-          x: qrX,
-          y: qrY,
-          width: qrSize,
-          height: qrSize
-        });
-
-        const contentX = qrX + qrSize + pad;
-        const contentW = Math.max(30, (posX + boxW - pad) - contentX);
-        const contentH = boxH - (pad * 2);
-
-        const fontSizeSigner = Math.max(5.5, Math.min(9.5, boxH * 0.09));
-        const fontSizeBody = Math.max(4.5, Math.min(7.5, boxH * 0.07));
-        const lineSpacing = fontSizeBody + 3;
-
-        const specH = Math.max(16, contentH - (3 * lineSpacing) - 2);
-        const specY = posY + pad + (3 * lineSpacing) + 2;
-
+        // Mode Spesimen Murni: Cukup bubuhkan gambar spesimen pengguna di area yang dipilih tanpa QR atau teks tambahan
         targetPage.drawImage(specimenEmbed, {
-          x: contentX,
-          y: specY,
-          width: contentW,
-          height: specH
-        });
-
-        targetPage.drawText('Ditandatangani secara elektronik:', {
-          x: contentX,
-          y: posY + pad + (lineSpacing * 2),
-          size: fontSizeBody,
-          font: fontBody,
-          color: PDFLib.rgb(0.25, 0.25, 0.25)
-        });
-
-        targetPage.drawText(opts.signerName || 'Penanda Tangan', {
-          x: contentX,
-          y: posY + pad + lineSpacing,
-          size: fontSizeSigner,
-          font: fontHeader,
-          color: PDFLib.rgb(0.0, 0.2, 0.6)
-        });
-
-        targetPage.drawText(`No. Reg: ${opts.receiptId}`, {
-          x: contentX,
-          y: posY + pad,
-          size: Math.max(4, fontSizeBody - 0.5),
-          font: fontBody,
-          color: PDFLib.rgb(0.4, 0.4, 0.4)
+          x: posX,
+          y: posY,
+          width: boxW,
+          height: boxH
         });
       } else {
-        // Mode QR Code + Nama di Bawah QR Code (Sesuai Permintaan)
-        // Posisi: QR Code di atas/tengah, Nama di bawah QR Code
-        const textAreaHeight = Math.max(24, boxH * 0.38);
-        const qrSize = Math.max(24, Math.min(boxH - textAreaHeight - (pad * 2), boxW - (pad * 2)));
+        // Mode QR Code + Nama di Bawah QR Code (Hanya jika tanpa spesimen)
+        targetPage.drawRectangle({
+          x: posX,
+          y: posY,
+          width: boxW,
+          height: boxH,
+          borderColor: PDFLib.rgb(0.08, 0.32, 0.72),
+          borderWidth: 1.2,
+          color: PDFLib.rgb(0.97, 0.985, 1.0)
+        });
+
+        const pad = Math.max(4, Math.min(8, boxH * 0.08));
+        const textAreaHeight = Math.max(22, boxH * 0.36);
+        const qrSize = Math.max(20, Math.min(boxH - textAreaHeight - (pad * 2), boxW - (pad * 2)));
         const qrX = posX + (boxW - qrSize) / 2;
         const qrY = posY + textAreaHeight + (pad / 2);
 
@@ -198,7 +149,7 @@ window.PDFSigner = (function() {
         });
 
         const fontSizeSigner = Math.max(6, Math.min(10, boxH * 0.11));
-        const fontSizeBody = Math.max(4.5, Math.min(7, boxH * 0.07));
+        const fontSizeBody = Math.max(4, Math.min(6.5, boxH * 0.065));
 
         const signerName = opts.signerName || 'Penanda Tangan';
         const nameWidth = fontHeader.widthOfTextAtSize(signerName, fontSizeSigner);
@@ -206,7 +157,7 @@ window.PDFSigner = (function() {
 
         targetPage.drawText(signerName, {
           x: nameX,
-          y: posY + textAreaHeight - fontSizeSigner - 2,
+          y: posY + textAreaHeight - fontSizeSigner - 1,
           size: fontSizeSigner,
           font: fontHeader,
           color: PDFLib.rgb(0.05, 0.2, 0.55)

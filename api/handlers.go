@@ -966,6 +966,51 @@ func (h *APIHandler) HandlePAdESSign(w http.ResponseWriter, r *http.Request) {
 	}, "Dokumen berhasil ditandatangani secara digital standar ISO 32000-1 PAdES")
 }
 
+type PAdESVerifyRequest struct {
+	PDFBase64 string `json:"pdf_base64"`
+}
+
+func (h *APIHandler) HandlePAdESVerify(w http.ResponseWriter, r *http.Request) {
+	var req PAdESVerifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Payload JSON tidak valid: "+err.Error())
+		return
+	}
+
+	if req.PDFBase64 == "" {
+		SendError(w, http.StatusBadRequest, "Parameter pdf_base64 wajib diisi")
+		return
+	}
+
+	pdfBytes, err := crypto.DecodeHexOrBase64(req.PDFBase64)
+	if err != nil {
+		SendError(w, http.StatusBadRequest, "Encoding berkas PDF tidak valid: "+err.Error())
+		return
+	}
+
+	res, err := crypto.VerifyPDFPAdES(pdfBytes)
+	if err != nil {
+		SendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if h.store.IsCertificateRevoked(res.CertSerialNumber) {
+		res.IsRevoked = true
+		res.IsValid = false
+		res.Message = "DOKUMEN DITOLAK: Sertifikat elektronik penanda tangan telah dicabut resmi (Revoked)!"
+		res.IntegrityStatus = res.Message
+	}
+
+	statusStr := "SUCCESS"
+	if !res.IsValid {
+		statusStr = "REJECTED"
+	}
+	_ = h.store.RecordAudit("PAdESVerify", "ISO32000-1", 0, statusStr, fmt.Sprintf("Verifikasi dokumen PAdES untuk %s (ID: %s, Valid: %v)", res.SignerFullName, res.ReceiptID, res.IsValid))
+	_ = h.store.RecordActivity("SECURITY", "INFO", res.SignerFullName, "PAdES_VERIFY_DOCUMENT", fmt.Sprintf("Verifikasi keabsahan dokumen (ID: %s, Valid: %v)", res.ReceiptID, res.IsValid), r.RemoteAddr, r.UserAgent())
+
+	SendSuccess(w, res, "Verifikasi keabsahan dokumen selesai")
+}
+
 func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request) {
 	ca, err := crypto.GetARSignAuthority()
 	if err != nil {

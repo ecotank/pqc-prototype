@@ -47,6 +47,7 @@ func RegisterRoutes(mux *http.ServeMux, h *APIHandler) {
 
 	// 12. PAdES ISO 32000-1 Digital Signature & CA Endpoints
 	mux.HandleFunc("POST /api/v1/pades/sign", h.HandlePAdESSign)
+	mux.HandleFunc("POST /api/v1/pades/verify", h.HandlePAdESVerify)
 	mux.HandleFunc("GET /api/v1/ca/certificates", h.HandleCACertificates)
 
 	// 13. Layanan Verifikasi Email OTP
