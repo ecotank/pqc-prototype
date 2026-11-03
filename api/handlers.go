@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -401,7 +402,17 @@ func (h *APIHandler) HandleAuditLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) HandleRegistryList(w http.ResponseWriter, r *http.Request) {
-	list, err := h.store.GetRegistryList(50)
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	if username == "" {
+		username = strings.TrimSpace(r.URL.Query().Get("signer"))
+	}
+	limitStr := r.URL.Query().Get("limit")
+	limit := 100
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+
+	list, err := h.store.GetRegistryList(username, limit)
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -415,11 +426,85 @@ func (h *APIHandler) HandleRegistryRecord(w http.ResponseWriter, r *http.Request
 		SendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.store.RecordRegistry(item.ID, item.Title, item.Signer, item.Algorithm, item.Time, item.DocumentHash, item.SignatureHex); err != nil {
+	if err := h.store.RecordRegistry(item.ID, item.Title, item.Signer, item.Algorithm, item.Time, item.DocumentHash, item.SignatureHex, item.Username); err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	SendSuccess(w, item, "Tercatat di buku registrasi")
+}
+
+type UpdatePasswordReq struct {
+	Username    string `json:"username"`
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+func (h *APIHandler) HandleUpdatePassword(w http.ResponseWriter, r *http.Request) {
+	var req UpdatePasswordReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+	user, err := h.store.GetUserByUsername(req.Username)
+	if err != nil || user.PasswordHash != storage.HashPassword(req.OldPassword) {
+		SendError(w, http.StatusUnauthorized, "Kata sandi lama tidak sesuai")
+		return
+	}
+	rawPrivKey, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, req.OldPassword)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal membuka vault kunci privat: "+err.Error())
+		return
+	}
+	newEncKey, err := crypto.EncryptPrivateKey(rawPrivKey, req.NewPassword)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal mengenkripsi kunci dengan kata sandi baru")
+		return
+	}
+	if err := h.store.UpdateUserPassword(req.Username, storage.HashPassword(req.NewPassword), newEncKey); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal memperbarui kata sandi: "+err.Error())
+		return
+	}
+	_ = h.store.RecordActivity("AUTH", "INFO", req.Username, "USER_PASSWORD_CHANGED", "Kata sandi pengguna berhasil diperbarui", r.RemoteAddr, r.UserAgent())
+	SendSuccess(w, nil, "Kata sandi berhasil diperbarui")
+}
+
+type UpdateProfileReq struct {
+	Username    string `json:"username"`
+	FullName    string `json:"fullname"`
+	Email       string `json:"email"`
+	Institution string `json:"institution"`
+}
+
+func (h *APIHandler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	var req UpdateProfileReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+	if err := h.store.UpdateUserProfile(req.Username, req.FullName, req.Email, req.Institution); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal memperbarui profil: "+err.Error())
+		return
+	}
+	_ = h.store.RecordActivity("AUTH", "INFO", req.Username, "USER_PROFILE_UPDATED", "Data profil pengguna berhasil diperbarui", r.RemoteAddr, r.UserAgent())
+	SendSuccess(w, nil, "Data profil berhasil diperbarui")
+}
+
+type UpdateSpecimenReq struct {
+	Username string `json:"username"`
+	Specimen string `json:"specimen"`
+}
+
+func (h *APIHandler) HandleUpdateSpecimen(w http.ResponseWriter, r *http.Request) {
+	var req UpdateSpecimenReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
+		return
+	}
+	if err := h.store.UpdateUserSpecimen(req.Username, req.Specimen); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal menyimpan spesimen tanda tangan: "+err.Error())
+		return
+	}
+	SendSuccess(w, nil, "Spesimen tanda tangan berhasil disimpan")
 }
 
 type TraceSignReq struct {

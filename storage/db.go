@@ -41,20 +41,22 @@ type RegistryEntry struct {
 	Time         string `json:"time"`
 	DocumentHash string `json:"document_hash"`
 	SignatureHex string `json:"signature_hex,omitempty"`
+	Username     string `json:"username,omitempty"`
 }
 
 type User struct {
-	ID              string `json:"id"`
-	Username        string `json:"username"`
-	PasswordHash    string `json:"password_hash,omitempty"`
-	FullName        string `json:"fullname"`
-	NikNip          string `json:"nik_nip"`
-	Institution     string `json:"institution"`
-	Email           string `json:"email"`
-	Role            string `json:"role"` // "ASN", "PUBLIC", "ADMIN"
-	MldsaPublicKey  string `json:"mldsa_public_key"`
-	MldsaPrivateKey string `json:"mldsa_private_key,omitempty"`
-	CreatedAt       string `json:"created_at"`
+	ID                string `json:"id"`
+	Username          string `json:"username"`
+	PasswordHash      string `json:"password_hash,omitempty"`
+	FullName          string `json:"fullname"`
+	NikNip            string `json:"nik_nip"`
+	Institution       string `json:"institution"`
+	Email             string `json:"email"`
+	Role              string `json:"role"` // "ASN", "PUBLIC", "ADMIN"
+	MldsaPublicKey    string `json:"mldsa_public_key"`
+	MldsaPrivateKey   string `json:"mldsa_private_key,omitempty"`
+	SpecimenSignature string `json:"specimen_signature,omitempty"`
+	CreatedAt         string `json:"created_at"`
 }
 
 func HashPassword(pwd string) string {
@@ -132,6 +134,9 @@ func InitStorage(dbPath string) (*Storage, error) {
 		return nil, fmt.Errorf("gagal migrasi skema database: %w", err)
 	}
 
+	_, _ = db.Exec("ALTER TABLE document_registry ADD COLUMN username TEXT DEFAULT ''")
+	_, _ = db.Exec("ALTER TABLE users ADD COLUMN specimen_signature TEXT DEFAULT ''")
+
 	s := &Storage{db: db}
 	s.seedInitialData()
 	return s, nil
@@ -149,6 +154,7 @@ func (s *Storage) seedInitialData() {
 			"2026-10-27 09:14 WIB",
 			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 			"",
+			"satria.alba",
 		)
 		_ = s.RecordRegistry(
 			"ARSIGN-2026-002",
@@ -158,6 +164,7 @@ func (s *Storage) seedInitialData() {
 			"2026-10-26 14:32 WIB",
 			"d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
 			"",
+			"raditya",
 		)
 	}
 }
@@ -198,25 +205,32 @@ func (s *Storage) GetAuditLogs(limit int) ([]AuditEntry, error) {
 	return entries, nil
 }
 
-func (s *Storage) RecordRegistry(id, title, signer, alg, timeStr, docHash, sigHex string) error {
+func (s *Storage) RecordRegistry(id, title, signer, alg, timeStr, docHash, sigHex, username string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `INSERT OR REPLACE INTO document_registry (id, title, signer, algorithm, time_str, document_hash, signature_hex) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	_, err := s.db.Exec(query, id, title, signer, alg, timeStr, docHash, sigHex)
+	query := `INSERT OR REPLACE INTO document_registry (id, title, signer, algorithm, time_str, document_hash, signature_hex, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := s.db.Exec(query, id, title, signer, alg, timeStr, docHash, sigHex, username)
 	return err
 }
 
-func (s *Storage) GetRegistryList(limit int) ([]RegistryEntry, error) {
+func (s *Storage) GetRegistryList(username string, limit int) ([]RegistryEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if limit <= 0 {
-		limit = 50
+		limit = 100
 	}
 
-	query := `SELECT id, title, signer, algorithm, time_str, document_hash, signature_hex FROM document_registry ORDER BY rowid DESC LIMIT ?`
-	rows, err := s.db.Query(query, limit)
+	var rows *sql.Rows
+	var err error
+	if username != "" {
+		query := `SELECT id, title, signer, algorithm, time_str, document_hash, signature_hex, COALESCE(username, '') FROM document_registry WHERE username = ? OR signer LIKE ? ORDER BY rowid DESC LIMIT ?`
+		rows, err = s.db.Query(query, username, "%"+username+"%", limit)
+	} else {
+		query := `SELECT id, title, signer, algorithm, time_str, document_hash, signature_hex, COALESCE(username, '') FROM document_registry ORDER BY rowid DESC LIMIT ?`
+		rows, err = s.db.Query(query, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +239,7 @@ func (s *Storage) GetRegistryList(limit int) ([]RegistryEntry, error) {
 	var list []RegistryEntry
 	for rows.Next() {
 		var r RegistryEntry
-		if err := rows.Scan(&r.ID, &r.Title, &r.Signer, &r.Algorithm, &r.Time, &r.DocumentHash, &r.SignatureHex); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &r.Signer, &r.Algorithm, &r.Time, &r.DocumentHash, &r.SignatureHex, &r.Username); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
@@ -247,20 +261,47 @@ func (s *Storage) GetUserByUsername(username string) (*User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `SELECT id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, created_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, COALESCE(specimen_signature, ''), created_at FROM users WHERE username = ?`
 	var u User
-	err := s.db.QueryRow(query, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.MldsaPrivateKey, &u.CreatedAt)
+	err := s.db.QueryRow(query, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.MldsaPrivateKey, &u.SpecimenSignature, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
+func (s *Storage) UpdateUserPassword(username, newPassHash, newEncKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `UPDATE users SET password_hash = ?, mldsa_private_key = ? WHERE username = ?`
+	_, err := s.db.Exec(query, newPassHash, newEncKey, username)
+	return err
+}
+
+func (s *Storage) UpdateUserProfile(username, fullname, email, institution string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `UPDATE users SET fullname = ?, email = ?, institution = ? WHERE username = ?`
+	_, err := s.db.Exec(query, fullname, email, institution, username)
+	return err
+}
+
+func (s *Storage) UpdateUserSpecimen(username, specimen string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `UPDATE users SET specimen_signature = ? WHERE username = ?`
+	_, err := s.db.Exec(query, specimen, username)
+	return err
+}
+
 func (s *Storage) GetUsersList() ([]User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `SELECT id, username, fullname, nik_nip, institution, email, role, mldsa_public_key, created_at FROM users ORDER BY role DESC, fullname ASC`
+	query := `SELECT id, username, fullname, nik_nip, institution, email, role, mldsa_public_key, COALESCE(specimen_signature, ''), created_at FROM users ORDER BY role DESC, fullname ASC`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -270,7 +311,7 @@ func (s *Storage) GetUsersList() ([]User, error) {
 	var list []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.SpecimenSignature, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, u)

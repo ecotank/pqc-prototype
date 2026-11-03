@@ -55,6 +55,11 @@ func RegisterRoutes(mux *http.ServeMux, h *APIHandler) {
 	// 14. Certificate Revocation List (CRL) & Status Pencabutan Sertifikat
 	mux.HandleFunc("GET /api/v1/ca/crl", h.HandleCACRL)
 	mux.HandleFunc("POST /api/v1/ca/revoke", AdminAuthMiddleware(h.HandleCARevoke))
+
+	// 15. Pengaturan Akun & Profil Pengguna
+	mux.HandleFunc("POST /api/v1/user/password", h.HandleUpdatePassword)
+	mux.HandleFunc("POST /api/v1/user/profile", h.HandleUpdateProfile)
+	mux.HandleFunc("POST /api/v1/user/specimen", h.HandleUpdateSpecimen)
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {
