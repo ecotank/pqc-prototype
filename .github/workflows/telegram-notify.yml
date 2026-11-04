@@ -11,24 +11,10 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Telegram credentials
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            echo "HAS_TELEGRAM=true" >> "$GITHUB_ENV"
-          else
-            echo "HAS_TELEGRAM=false" >> "$GITHUB_ENV"
-            echo "::notice::Secret TELEGRAM_TOKEN/TELEGRAM_CHAT_ID belum disetel; notifikasi dilewati."
-          fi
-      # Kredensial bot wajib datang dari GitHub Secrets (Settings > Secrets and variables > Actions).
-      # Langkah ini dilewati otomatis bila secret belum disetel, sehingga fork tidak gagal.
       - name: Send Notification to Telegram
-        if: ${{ env.HAS_TELEGRAM == 'true' }}
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN || '9225149450:AAFNj2GID7nSk3dNf9f3okmuWYrXrN5SL-0' }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '1127148301' }}
           EVENT_NAME: ${{ github.event_name }}
           ACTOR: ${{ github.actor }}
           REF_NAME: ${{ github.ref_name }}
