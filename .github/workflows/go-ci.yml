@@ -1,0 +1,49 @@
+name: Go Build, Vet & Test
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Periksa format berkas Go
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Berkas berikut belum diformat dengan gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go build
+        run: go build ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      # Material CA dialihkan ke direktori sementara agar pengujian tidak
+      # menimpa berkas sertifikat di dalam repo (lihat AGENTS.md bagian 7).
+      - name: go test
+        env:
+          ARSIGN_CA_DIR: ${{ runner.temp }}/arsign-ca
+        run: go test ./...
+
+      - name: Pastikan pengujian tidak mengubah berkas repo
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Pengujian meninggalkan perubahan pada working tree:"
+            git status --porcelain
+            exit 1
+          fi

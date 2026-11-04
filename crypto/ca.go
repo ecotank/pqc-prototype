@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -30,20 +31,37 @@ type ARSignAuthority struct {
 
 var (
 	globalCA     *ARSignAuthority
+	globalCAErr  error
 	globalCAOnce sync.Once
 )
 
-// GetARSignAuthority mengembalikan instance tunggal Otoritas Sertifikasi ARSign
+// GetARSignAuthority mengembalikan instance tunggal Otoritas Sertifikasi ARSign.
+// Error inisialisasi disimpan di variabel paket; tanpa itu sync.Once membuat
+// pemanggilan kedua mengembalikan (nil, nil) dan memicu nil dereference di pemanggil.
 func GetARSignAuthority() (*ARSignAuthority, error) {
-	var err error
 	globalCAOnce.Do(func() {
-		globalCA, err = initARSignAuthority()
+		globalCA, globalCAErr = initARSignAuthority()
 	})
-	return globalCA, err
+	if globalCAErr != nil {
+		return nil, globalCAErr
+	}
+	if globalCA == nil {
+		return nil, fmt.Errorf("otoritas sertifikasi ARSign tidak tersedia")
+	}
+	return globalCA, nil
+}
+
+// caKeysDir mengembalikan direktori penyimpanan material CA.
+// Dapat dialihkan lewat ARSIGN_CA_DIR agar proses uji tidak menulis ke direktori kerja repo.
+func caKeysDir() string {
+	if dir := strings.TrimSpace(os.Getenv("ARSIGN_CA_DIR")); dir != "" {
+		return dir
+	}
+	return "ca_keys"
 }
 
 func initARSignAuthority() (*ARSignAuthority, error) {
-	caDir := "ca_keys"
+	caDir := caKeysDir()
 	if err := os.MkdirAll(caDir, 0700); err != nil {
 		return nil, fmt.Errorf("gagal membuat direktori penyimpanan CA: %w", err)
 	}
@@ -86,10 +104,18 @@ func initARSignAuthority() (*ARSignAuthority, error) {
 		Locality:           []string{"Jakarta Selatan"},
 	}
 
-	rootSKID := computeSKI(&rootKey.PublicKey)
+	rootSKID, err := computeSKI(&rootKey.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("gagal menghitung SubjectKeyIdentifier Root CA: %w", err)
+	}
+
+	rootSerial, err := randomSerialNumber()
+	if err != nil {
+		return nil, fmt.Errorf("gagal membangkitkan serial Root CA: %w", err)
+	}
 
 	rootTemplate := x509.Certificate{
-		SerialNumber:          big.NewInt(1000000001),
+		SerialNumber:          rootSerial,
 		Subject:               rootSubj,
 		NotBefore:             time.Now().Add(-24 * time.Hour),
 		NotAfter:              time.Now().Add(20 * 365 * 24 * time.Hour),
@@ -123,10 +149,18 @@ func initARSignAuthority() (*ARSignAuthority, error) {
 		Country:            []string{"ID"},
 	}
 
-	subSKID := computeSKI(&subKey.PublicKey)
+	subSKID, err := computeSKI(&subKey.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("gagal menghitung SubjectKeyIdentifier Sub-CA: %w", err)
+	}
+
+	subSerial, err := randomSerialNumber()
+	if err != nil {
+		return nil, fmt.Errorf("gagal membangkitkan serial Sub-CA: %w", err)
+	}
 
 	subTemplate := x509.Certificate{
-		SerialNumber:          big.NewInt(2000000002),
+		SerialNumber:          subSerial,
 		Subject:               subSubj,
 		NotBefore:             time.Now().Add(-24 * time.Hour),
 		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
@@ -152,12 +186,14 @@ func initARSignAuthority() (*ARSignAuthority, error) {
 	_ = saveKeyAndCert(rootKeyPath, rootCertPath, rootKey, rootCertDER)
 	_ = saveKeyAndCert(subKeyPath, subCertPath, subKey, subCertDER)
 
-	// Ekspor juga ke direktori utama agar mudah diakses
+	// Salinan PEM untuk kemudahan akses ditulis DI DALAM direktori CA.
+	// Sebelumnya ditulis ke direktori kerja, sehingga `go test ./crypto` menimpa
+	// crypto/ARSIGN_*.crt|pem dan memunculkan diff palsu pada repo.
 	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER})
 	subPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: subCertDER})
-	_ = os.WriteFile("ARSIGN_Root_and_SubCA.pem", append(subPEM, rootPEM...), 0644)
-	_ = os.WriteFile("ARSIGN_Root_CA.crt", rootPEM, 0644)
-	_ = os.WriteFile("ARSIGN_Sub_CA.crt", subPEM, 0644)
+	_ = os.WriteFile(filepath.Join(caDir, "ARSIGN_Root_and_SubCA.pem"), append(subPEM, rootPEM...), 0644)
+	_ = os.WriteFile(filepath.Join(caDir, "ARSIGN_Root_CA.crt"), rootPEM, 0644)
+	_ = os.WriteFile(filepath.Join(caDir, "ARSIGN_Sub_CA.crt"), subPEM, 0644)
 
 	return &ARSignAuthority{
 		RootKey:      rootKey,
@@ -241,9 +277,9 @@ func (ca *ARSignAuthority) IssueSignerCertificate(fullname, email, nikNip, insti
 	ca.mu.Lock()
 	defer ca.mu.Unlock()
 
-	serialNumber, err := rand.Int(rand.Reader, big.NewInt(1000000000000000))
+	serialNumber, err := randomSerialNumber()
 	if err != nil {
-		serialNumber = big.NewInt(time.Now().UnixNano())
+		return nil, nil, fmt.Errorf("gagal membangkitkan serial sertifikat: %w", err)
 	}
 
 	subj := pkix.Name{
@@ -254,20 +290,26 @@ func (ca *ARSignAuthority) IssueSignerCertificate(fullname, email, nikNip, insti
 		Country:            []string{"ID"},
 	}
 
-	signerSKID := computeSKI(signerPubKey)
+	signerSKID, err := computeSKI(signerPubKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gagal menghitung SubjectKeyIdentifier penanda tangan: %w", err)
+	}
 
 	template := x509.Certificate{
-		SerialNumber:          serialNumber,
-		Subject:               subj,
-		NotBefore:             time.Now().Add(-1 * time.Hour),
-		NotAfter:              time.Now().Add(3 * 365 * 24 * time.Hour), // Berlaku 3 Tahun
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection, x509.ExtKeyUsageCodeSigning, x509.ExtKeyUsageTimeStamping},
+		SerialNumber: serialNumber,
+		Subject:      subj,
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(3 * 365 * 24 * time.Hour), // Berlaku 3 Tahun
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
+		// Sertifikat tanda tangan dokumen: hanya EmailProtection (S/MIME-CMS).
+		// CodeSigning & TimeStamping dihapus karena di luar peruntukan TTE.
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection},
 		BasicConstraintsValid: true,
 		IsCA:                  false,
 		SubjectKeyId:          signerSKID,
 		AuthorityKeyId:        ca.SubCACert.SubjectKeyId,
 		EmailAddresses:        []string{email},
+		CRLDistributionPoints: []string{crlDistributionPoint()},
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, ca.SubCACert, signerPubKey, ca.SubCAKey)
@@ -293,15 +335,42 @@ func (ca *ARSignAuthority) ExportPEMCertificates() string {
 	return string(subPEM) + "\n" + string(rootPEM)
 }
 
-func computeSKI(pub crypto.PublicKey) []byte {
-	switch k := pub.(type) {
-	case *rsa.PublicKey:
-		b, err := asn1.Marshal(*k)
-		if err == nil {
-			h := sha1.Sum(b)
-			return h[:]
-		}
+// computeSKI menghitung SubjectKeyIdentifier sesuai RFC 5280 bagian 4.2.1.2 metode (1):
+// SHA-1 atas isi BIT STRING subjectPublicKey pada struktur SubjectPublicKeyInfo.
+// Implementasi lama meng-hash asn1.Marshal(rsa.PublicKey) sehingga nilainya tidak
+// dikenali verifier X.509 standar.
+func computeSKI(pub crypto.PublicKey) ([]byte, error) {
+	spkiDER, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, fmt.Errorf("gagal marshal SubjectPublicKeyInfo: %w", err)
 	}
-	h := sha1.Sum([]byte(fmt.Sprintf("%v", pub)))
-	return h[:]
+
+	var spki struct {
+		Algorithm        pkix.AlgorithmIdentifier
+		SubjectPublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(spkiDER, &spki); err != nil {
+		return nil, fmt.Errorf("gagal parse SubjectPublicKeyInfo: %w", err)
+	}
+
+	h := sha1.Sum(spki.SubjectPublicKey.Bytes)
+	return h[:], nil
+}
+
+// randomSerialNumber membangkitkan serial sertifikat 128-bit positif sesuai RFC 5280.
+func randomSerialNumber() (*big.Int, error) {
+	limit := new(big.Int).Lsh(big.NewInt(1), 127)
+	n, err := rand.Int(rand.Reader, limit)
+	if err != nil {
+		return nil, err
+	}
+	return n.Add(n, big.NewInt(1)), nil
+}
+
+// crlDistributionPoint mengembalikan URL CRL yang disematkan pada sertifikat terbitan.
+func crlDistributionPoint() string {
+	if base := strings.TrimSpace(os.Getenv("ARSIGN_CRL_URL")); base != "" {
+		return base
+	}
+	return "http://localhost:8080/api/v1/ca/crl?format=pem"
 }

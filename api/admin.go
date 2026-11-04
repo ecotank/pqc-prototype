@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -8,26 +9,31 @@ import (
 	"strings"
 )
 
-// AdminAuthMiddleware mengamankan endpoint administrator
+// AdminAuthMiddleware mengamankan endpoint administrator.
+//
+// Perubahan keamanan dibanding versi sebelumnya:
+//   - kunci tidak lagi diterima lewat query string (?key=...), karena nilai itu
+//     ikut tercatat di log akses, riwayat peramban, dan header Referer;
+//   - tidak ada lagi kunci cadangan hardcoded; bila ADMIN_SECRET_KEY belum
+//     disetel, layanan administrator menolak melayani permintaan;
+//   - perbandingan kunci dilakukan dalam waktu konstan.
 func AdminAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		adminKey := os.Getenv("ADMIN_SECRET_KEY")
+		adminKey := strings.TrimSpace(os.Getenv("ADMIN_SECRET_KEY"))
 		if adminKey == "" {
-			adminKey = "ARSign-SuperAdmin-PQC2026!"
+			SendError(w, http.StatusServiceUnavailable,
+				"Layanan administrator tidak aktif: ADMIN_SECRET_KEY belum disetel pada lingkungan server")
+			return
 		}
 
 		key := r.Header.Get("X-Admin-Key")
 		if key == "" {
-			key = r.URL.Query().Get("key")
-		}
-		if key == "" {
-			authHeader := r.Header.Get("Authorization")
-			if strings.HasPrefix(authHeader, "Bearer ") {
+			if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
 				key = strings.TrimPrefix(authHeader, "Bearer ")
 			}
 		}
 
-		if key != adminKey {
+		if subtle.ConstantTimeCompare([]byte(key), []byte(adminKey)) != 1 {
 			SendError(w, http.StatusUnauthorized, "Akses ditolak: Kredensial Administrator tidak valid")
 			return
 		}
@@ -99,4 +105,3 @@ func RegisterAdminRoutes(mux *http.ServeMux, h *APIHandler) {
 	mux.HandleFunc("GET /api/v1/admin/stats", AdminAuthMiddleware(h.HandleAdminStats))
 	mux.HandleFunc("GET /api/v1/admin/export", AdminAuthMiddleware(h.HandleAdminExportLogs))
 }
-

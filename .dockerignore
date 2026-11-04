@@ -1,11 +1,30 @@
 .git
+.github
 *.exe
 *.exe~
+
+# Rahasia & material kriptografi: tidak boleh masuk ke dalam image
+.env
+*.key
+*.pem
+ca_keys/
+crypto/ca_keys/
+
+# State runtime
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Artefak pengujian & pengembangan
 *.p7s
 *.pdf
 *.bin
+test_*
+benchmark_results.json
+docs/
 scratch/
 tmp/
 .system_generated/
 .netlify/
-
+.remember/

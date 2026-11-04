@@ -152,26 +152,24 @@ func main() {
 		_, _ = w.Write(data)
 	})
 
-	serverProd := &http.Server{
-		Addr:         ":" + portProd,
-		Handler:      api.CORSMiddleware(muxProd),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	// ReadTimeout 15 detik sebelumnya memutus unggahan dokumen berukuran besar.
+	// Batas header tetap ketat, sedangkan badan permintaan diberi waktu lebih
+	// panjang dan dibatasi ukurannya oleh api.CORSMiddleware.
+	newServer := func(port string, handler http.Handler) *http.Server {
+		return &http.Server{
+			Addr:              ":" + port,
+			Handler:           handler,
+			ReadHeaderTimeout: 15 * time.Second,
+			ReadTimeout:       120 * time.Second,
+			WriteTimeout:      120 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			MaxHeaderBytes:    1 << 20,
+		}
 	}
 
-	serverProc := &http.Server{
-		Addr:         ":" + portProc,
-		Handler:      api.CORSMiddleware(muxProc),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
-
-	serverAdmin := &http.Server{
-		Addr:         ":" + portAdmin,
-		Handler:      api.CORSMiddleware(muxAdmin),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
+	serverProd := newServer(portProd, api.CORSMiddleware(muxProd))
+	serverProc := newServer(portProc, api.CORSMiddleware(muxProc))
+	serverAdmin := newServer(portAdmin, api.CORSMiddleware(muxAdmin))
 
 	_ = store.RecordActivity("SYSTEM", "INFO", "SYSTEM", "SERVER_STARTUP", fmt.Sprintf("Layanan ARSign TTE Pascakuantum aktif di Port %s (Prod), %s (Lab), %s (Admin Audit)", portProd, portProc, portAdmin), "127.0.0.1", "pqc-server")
 
@@ -187,6 +185,10 @@ func main() {
 	fmt.Printf("   [2] WEB VISUALISASI PROSES (Lab PQC)  : http://localhost:%s\n", portProc)
 	fmt.Printf("   [3] SERVICE AUDIT & LOG ADMIN (Port)  : http://localhost:%s\n", portAdmin)
 	fmt.Println("================================================================")
+
+	if os.Getenv("ADMIN_SECRET_KEY") == "" {
+		log.Println("[PERINGATAN] ADMIN_SECRET_KEY belum disetel. Seluruh endpoint administrator dan daftar pengguna akan menolak permintaan.")
+	}
 
 	// Goroutine untuk listener Web Proses
 	if portProc != portProd && portProc != "" {
@@ -206,17 +208,25 @@ func main() {
 		}()
 	}
 
-	// Goroutine untuk listener Web Produksi
+	// Goroutine untuk listener Web Produksi.
+	// Galat dikirim lewat kanal, bukan log.Fatalf di dalam goroutine, agar jalur
+	// graceful shutdown tetap dijalankan dan basis data ditutup dengan benar.
+	fatalErr := make(chan error, 1)
 	go func() {
 		if err := serverProd.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server Produksi berhenti: %v", err)
+			fatalErr <- fmt.Errorf("server produksi berhenti: %w", err)
 		}
 	}()
 
 	// Graceful Shutdown on Interrupt
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
+
+	select {
+	case <-quit:
+	case err := <-fatalErr:
+		log.Printf("[FATAL] %v", err)
+	}
 
 	fmt.Println("\n[*] Menghentikan server secara graceful...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

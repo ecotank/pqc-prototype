@@ -16,22 +16,22 @@ import (
 )
 
 type BenchmarkItem struct {
-	Algorithm          string  `json:"algorithm"`
-	Family             string  `json:"family"` // "Post-Quantum (Lattice)" or "Classical"
-	Standard           string  `json:"standard"`
-	SecurityLevel      string  `json:"security_level"`
-	PublicKeyBytes     int     `json:"public_key_bytes"`
-	PrivateKeyBytes    int     `json:"private_key_bytes"`
-	SignatureBytes     int     `json:"signature_bytes"`
-	KeyGenMeanMs       float64 `json:"keygen_mean_ms"`
-	SignMeanMs         float64 `json:"sign_mean_ms"`
-	SignMedianMs       float64 `json:"sign_median_ms"`
-	SignP95Ms          float64 `json:"sign_p95_ms"`
-	VerifyMeanMs       float64 `json:"verify_mean_ms"`
-	VerifyMedianMs     float64 `json:"verify_median_ms"`
-	VerifyP95Ms        float64 `json:"verify_p95_ms"`
-	TargetCompliant    bool    `json:"target_compliant"` // =< 2.0 detik
-	FIPS204Compliant   bool    `json:"fips204_compliant"`
+	Algorithm        string  `json:"algorithm"`
+	Family           string  `json:"family"` // "Post-Quantum (Lattice)" or "Classical"
+	Standard         string  `json:"standard"`
+	SecurityLevel    string  `json:"security_level"`
+	PublicKeyBytes   int     `json:"public_key_bytes"`
+	PrivateKeyBytes  int     `json:"private_key_bytes"`
+	SignatureBytes   int     `json:"signature_bytes"`
+	KeyGenMeanMs     float64 `json:"keygen_mean_ms"`
+	SignMeanMs       float64 `json:"sign_mean_ms"`
+	SignMedianMs     float64 `json:"sign_median_ms"`
+	SignP95Ms        float64 `json:"sign_p95_ms"`
+	VerifyMeanMs     float64 `json:"verify_mean_ms"`
+	VerifyMedianMs   float64 `json:"verify_median_ms"`
+	VerifyP95Ms      float64 `json:"verify_p95_ms"`
+	TargetCompliant  bool    `json:"target_compliant"` // =< 2.0 detik
+	FIPS204Compliant bool    `json:"fips204_compliant"`
 }
 
 type BenchmarkReport struct {

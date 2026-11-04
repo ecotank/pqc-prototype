@@ -140,8 +140,23 @@ func TestPAdESSigningAndVerification(t *testing.T) {
 	p7File := filepath.Join(tmpDir, "signature.p7s")
 	_ = os.WriteFile(p7File, pkcs7Bytes, 0644)
 
-	opensslPath := `C:\Program Files\OpenSSL-Win64\bin\openssl.exe`
-	if _, err := os.Stat(opensslPath); err == nil {
+	// Cari OpenSSL di PATH terlebih dahulu; jalur Windows hardcoded sebelumnya
+	// membuat uji silang ini dilewati diam-diam pada hampir semua mesin.
+	opensslPath, lookErr := exec.LookPath("openssl")
+	if lookErr != nil {
+		for _, cand := range []string{
+			`C:\Program Files\OpenSSL-Win64\bin\openssl.exe`,
+			"/usr/bin/openssl",
+		} {
+			if _, err := os.Stat(cand); err == nil {
+				opensslPath, lookErr = cand, nil
+				break
+			}
+		}
+	}
+	if lookErr != nil {
+		t.Log("OpenSSL tidak tersedia di mesin ini; uji silang struktur PKCS#7 dilewati")
+	} else {
 		cmd := exec.Command(opensslPath, "pkcs7", "-in", p7File, "-inform", "DER", "-print_certs", "-noout")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
