@@ -34,3 +34,4 @@ test_output_*
 test_input_*
 *.bin
 *.p7s
+arsign-linux
