@@ -17,12 +17,21 @@ Selamat datang di proyek **ARSign**! Panduan ini dirancang agar kamu dapat langs
 
 ---
 
-## 2. Menggunakan Claude Code
-Ketika kamu membuka terminal di folder proyek ini dan menjalankan:
+## 2. Menggunakan Claude Code (CLI & GUI)
+
+### A. Jika Menggunakan Claude Code GUI (Aplikasi Desktop / VS Code / Cursor):
+1. Buka aplikasi Claude GUI kamu.
+2. Klik **Open Folder** / **Pilih Folder Proyek** -> pilih folder `pqc-prototype` hasil clone.
+3. Claude GUI akan **secara otomatis membaca file `CLAUDE.md`** sebagai konteks utama proyek.
+4. Kamu bisa langsung chatting santai, contoh:
+   > *"Tolong buatkan fitur X di `web/prod.js`"*
+5. Setelah Claude selesai mengedit, kamu bisa cek visual perubahannya langsung di tab **Source Control (Git)** pada aplikasi GUI kamu, lalu klik **Commit & Push**.
+
+### B. Jika Menggunakan Claude Code Terminal (CLI):
+Jalankan perintah:
 ```bash
 claude
 ```
-Agent Claude Code milikmu akan **secara otomatis membaca file `CLAUDE.md`** di root proyek. Dia sudah memahami seluruh arsitektur Go, skema database, dan standar kriptografi PAdES Pascakuantum (ML-DSA NIST FIPS 204).
 
 ---
 
@@ -50,3 +59,4 @@ Sebelum push, selalu pastikan fitur berjalan dengan script pengujian otomatis:
 node scratch/test_live_functional.js
 ```
 Jika seluruh indikator menunjukkan `[PASS]`, kode kamu aman dan siap digabungkan.
+
