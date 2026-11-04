@@ -21,9 +21,12 @@ import (
 var webFS embed.FS
 
 func main() {
-	portProd := os.Getenv("PORT_PROD")
+	portProd := os.Getenv("PORT")
 	if portProd == "" {
-		portProd = "8080"
+		portProd = os.Getenv("PORT_PROD")
+		if portProd == "" {
+			portProd = "8080"
+		}
 	}
 
 	portProc := os.Getenv("PORT_PROC")
@@ -88,6 +91,16 @@ func main() {
 		}
 		if r.URL.Path == "/process" || r.URL.Path == "/process.html" || r.URL.Path == "/lab" {
 			data, err := readWebFile("process.html")
+			if err != nil {
+				http.Error(w, "File not found", http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(data)
+			return
+		}
+		if r.URL.Path == "/admin" || r.URL.Path == "/admin.html" {
+			data, err := readWebFile("admin.html")
 			if err != nil {
 				http.Error(w, "File not found", http.StatusNotFound)
 				return
@@ -176,18 +189,22 @@ func main() {
 	fmt.Println("================================================================")
 
 	// Goroutine untuk listener Web Proses
-	go func() {
-		if err := serverProc.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Server Visualisasi Proses berhenti: %v", err)
-		}
-	}()
+	if portProc != portProd && portProc != "" {
+		go func() {
+			if err := serverProc.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("Server Visualisasi Proses berhenti: %v", err)
+			}
+		}()
+	}
 
 	// Goroutine untuk listener Service Admin
-	go func() {
-		if err := serverAdmin.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Service Administrator berhenti: %v", err)
-		}
-	}()
+	if portAdmin != portProd && portAdmin != "" {
+		go func() {
+			if err := serverAdmin.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("Service Administrator berhenti: %v", err)
+			}
+		}()
+	}
 
 	// Goroutine untuk listener Web Produksi
 	go func() {

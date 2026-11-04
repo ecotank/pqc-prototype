@@ -1,0 +1,10 @@
+.git
+*.exe
+*.exe~
+*.p7s
+*.pdf
+*.bin
+scratch/
+tmp/
+.system_generated/
+.netlify/

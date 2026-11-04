@@ -1,9 +1,13 @@
 module pqc-prototype
 
-go 1.26.5
+go 1.26.0
 
 require (
-	github.com/cloudflare/circl v1.6.5 // indirect
+	github.com/cloudflare/circl v1.6.5
+	modernc.org/sqlite v1.61.0
+)
+
+require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -13,5 +17,4 @@ require (
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.61.0 // indirect
 )
