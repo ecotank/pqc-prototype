@@ -39,3 +39,4 @@ node test_e2e_pades.js
 3. **Privasi UI**: Jangan tampilkan nama internal algoritma atau kunci mentah pada antarmuka publik pengguna umum. Gunakan label "Tersertifikasi Sah" atau indikator ramah pengguna.
 4. **Pencegahan Kebocoran Kunci**: `mldsa_private_key` dan `signing_passphrase_hash` tidak boleh diekspos dalam respons JSON API publik.
 5. **Git Workflow**: Buat branch baru untuk tiap fitur (`feature/nama-fitur`), jangan commit langsung kode eksperimental ke branch `main`.
+
