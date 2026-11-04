@@ -1,0 +1,75 @@
+name: Telegram Code Change Notification
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Notification to Telegram
+        env:
+          TELEGRAM_TOKEN: "9225149450:AAFNj2GID7nSk3dNf9f3okmuWYrXrN5SL-0"
+          TELEGRAM_CHAT_ID: "1127148301"
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          python3 - << 'EOF'
+          import urllib.request
+          import json
+          import os
+
+          token = os.environ.get("TELEGRAM_TOKEN")
+          chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+          event = os.environ.get("EVENT_NAME")
+          actor = os.environ.get("ACTOR", "Someone")
+          ref = os.environ.get("REF_NAME", "main")
+          repo = os.environ.get("REPO", "ecotank/pqc-prototype")
+
+          if event == "push":
+              msg = os.environ.get("COMMIT_MSG", "No commit message")
+              url = os.environ.get("COMMIT_URL", f"https://github.com/{repo}")
+              text = (
+                  f"🚀 *Perubahan Kode Baru Terdeteksi!*\n\n"
+                  f"📁 *Repository:* `{repo}`\n"
+                  f"🌿 *Branch:* `{ref}`\n"
+                  f"👤 *Author:* `{actor}`\n"
+                  f"📝 *Commit:* {msg}\n\n"
+                  f"🔗 [Klik Disini Untuk Melihat Before vs After]({url})"
+              )
+          else:
+              pr_title = os.environ.get("PR_TITLE", "Pull Request")
+              pr_url = os.environ.get("PR_URL", f"https://github.com/{repo}/pulls")
+              text = (
+                  f"📬 *Pull Request Baru Diajukan!*\n\n"
+                  f"📁 *Repository:* `{repo}`\n"
+                  f"👤 *Pengirim:* `{actor}`\n"
+                  f"📝 *Judul PR:* {pr_title}\n\n"
+                  f"🔗 [Klik Disini Untuk Review & Merge]({pr_url})"
+              )
+
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": text,
+              "parse_mode": "Markdown",
+              "disable_web_page_preview": False
+          }).encode("utf-8")
+
+          req = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"}
+          )
+          urllib.request.urlopen(req)
+          print("Telegram notification sent successfully!")
+          EOF
