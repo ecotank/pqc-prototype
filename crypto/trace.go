@@ -67,9 +67,9 @@ func TraceSignMLDSA(alg string, privKeyBytes []byte, payload []byte) (*TraceSign
 		Status:           "SUCCESS",
 		DurationMicrosec: d1,
 		Snapshots: map[string]string{
-			"input_length": fmt.Sprintf("%d Bytes", len(payload)),
+			"input_length":  fmt.Sprintf("%d Bytes", len(payload)),
 			"digest_sha256": hex.EncodeToString(h[:]),
-			"fips_variant": "Pre-hash ML-DSA (HashML-DSA) FIPS 204 §5.4",
+			"fips_variant":  "Pre-hash ML-DSA (HashML-DSA) FIPS 204 §5.4",
 		},
 	})
 
@@ -186,15 +186,15 @@ func TraceSignMLDSA(alg string, privKeyBytes []byte, payload []byte) (*TraceSign
 		SignatureHex:    hex.EncodeToString(sig),
 		SignatureBytes:  len(sig),
 		ByteBreakdown: map[string]int{
-			"challenge_seed_c": 32,
+			"challenge_seed_c":  32,
 			"response_vector_z": zBytes,
-			"hint_indices_h":   hintBytes,
+			"hint_indices_h":    hintBytes,
 		},
 		LatticeMetrics: map[string]string{
-			"Modulus (q)":          "8.380.417",
-			"Ring Degree (n)":      "256",
-			"Matrix Size (k x l)":  fmt.Sprintf("%d x %d", spec.MatrixK, spec.MatrixL),
-			"Security Level":       fmt.Sprintf("NIST Category %d", spec.SecurityCategory),
+			"Modulus (q)":         "8.380.417",
+			"Ring Degree (n)":     "256",
+			"Matrix Size (k x l)": fmt.Sprintf("%d x %d", spec.MatrixK, spec.MatrixL),
+			"Security Level":      fmt.Sprintf("NIST Category %d", spec.SecurityCategory),
 		},
 	}, nil
 }
@@ -333,7 +333,13 @@ func TraceVerifyMLDSA(alg string, pubKeyBytes []byte, payload []byte, sigBytes [
 		DurationMicrosec: d4 * 0.4,
 		Snapshots: map[string]string{
 			"hash_match": fmt.Sprintf("%v", valid),
-			"integrity":  func() string { if valid { return "UTUH (TIDAK ADA PERUBAHAN)" } else { return "TERPUTUS / DATA DIMANIPULASI" } }(),
+			"integrity": func() string {
+				if valid {
+					return "UTUH (TIDAK ADA PERUBAHAN)"
+				} else {
+					return "TERPUTUS / DATA DIMANIPULASI"
+				}
+			}(),
 		},
 	})
 

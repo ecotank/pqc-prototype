@@ -1,10 +1,16 @@
 package storage
 
 import (
+	"crypto/pbkdf2"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,25 +51,108 @@ type RegistryEntry struct {
 }
 
 type User struct {
-	ID                   string `json:"id"`
-	Username             string `json:"username"`
-	PasswordHash         string `json:"password_hash,omitempty"`
-	FullName             string `json:"fullname"`
-	NikNip               string `json:"nik_nip"`
-	Institution          string `json:"institution"`
-	Email                string `json:"email"`
-	Role                 string `json:"role"` // "ASN", "PUBLIC", "ADMIN"
-	MldsaPublicKey       string `json:"mldsa_public_key"`
-	MldsaPrivateKey      string `json:"mldsa_private_key,omitempty"`
-	SpecimenSignature    string `json:"specimen_signature,omitempty"`
+	ID                    string `json:"id"`
+	Username              string `json:"username"`
+	PasswordHash          string `json:"password_hash,omitempty"`
+	FullName              string `json:"fullname"`
+	NikNip                string `json:"nik_nip"`
+	Institution           string `json:"institution"`
+	Email                 string `json:"email"`
+	Role                  string `json:"role"` // "ASN", "PUBLIC", "ADMIN"
+	MldsaPublicKey        string `json:"mldsa_public_key"`
+	MldsaPrivateKey       string `json:"mldsa_private_key,omitempty"`
+	SpecimenSignature     string `json:"specimen_signature,omitempty"`
 	SigningPassphraseHash string `json:"signing_passphrase_hash,omitempty"`
-	HasPassphrase        bool   `json:"has_passphrase"`
-	CreatedAt            string `json:"created_at"`
+	HasPassphrase         bool   `json:"has_passphrase"`
+	CreatedAt             string `json:"created_at"`
+
+	// VaultCredential menyatakan kredensial mana yang membungkus kunci privat:
+	// "password" (bawaan) atau "passphrase" (passphrase penandatanganan).
+	// Tidak pernah diserialkan ke respons API publik.
+	VaultCredential string `json:"-"`
 }
 
+// Kredensial pembungkus vault kunci privat.
+const (
+	VaultCredentialPassword   = "password"
+	VaultCredentialPassphrase = "passphrase"
+)
+
+const (
+	// passwordHashPrefix menandai format hash kata sandi bersalt.
+	passwordHashPrefix = "pbkdf2-sha256"
+	// passwordHashIterations mengikuti rekomendasi OWASP untuk PBKDF2-HMAC-SHA256.
+	passwordHashIterations = 210000
+	passwordSaltBytes      = 16
+	passwordHashBytes      = 32
+)
+
+// HashPassword menghasilkan hash kata sandi bersalt memakai PBKDF2-HMAC-SHA256.
+// Format: pbkdf2-sha256$<iterasi>$<saltHex>$<hashHex>.
+//
+// Implementasi lama memakai SHA-256 telanjang tanpa salt dan tanpa iterasi,
+// sehingga seluruh basis data kata sandi dapat dipecahkan dengan tabel rainbow
+// atau serangan GPU paralel berbiaya sangat rendah.
 func HashPassword(pwd string) string {
+	salt := make([]byte, passwordSaltBytes)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		// Tanpa CSPRNG tidak ada hash yang dapat dipertanggungjawabkan.
+		panic(fmt.Sprintf("gagal membangkitkan salt kata sandi: %v", err))
+	}
+	sum, err := pbkdf2.Key(sha256.New, pwd, salt, passwordHashIterations, passwordHashBytes)
+	if err != nil {
+		panic(fmt.Sprintf("gagal menurunkan hash kata sandi: %v", err))
+	}
+	return fmt.Sprintf("%s$%d$%s$%s", passwordHashPrefix, passwordHashIterations,
+		hex.EncodeToString(salt), hex.EncodeToString(sum))
+}
+
+// hashPasswordLegacy mereproduksi hash versi lama, hanya untuk memverifikasi
+// kredensial yang sudah tersimpan sebelum migrasi.
+func hashPasswordLegacy(pwd string) string {
 	h := sha256.Sum256([]byte(pwd))
 	return hex.EncodeToString(h[:])
+}
+
+// IsLegacyPasswordHash melaporkan apakah hash tersimpan masih berformat lama,
+// sehingga pemanggil dapat memperbaruinya secara transparan setelah login sukses.
+func IsLegacyPasswordHash(stored string) bool {
+	return stored != "" && !strings.HasPrefix(stored, passwordHashPrefix+"$")
+}
+
+// VerifyPassword membandingkan kata sandi kandidat dengan hash tersimpan secara
+// waktu-konstan. Mendukung format lama maupun format bersalt.
+func VerifyPassword(stored, candidate string) bool {
+	if stored == "" {
+		return false
+	}
+
+	if IsLegacyPasswordHash(stored) {
+		return subtle.ConstantTimeCompare([]byte(stored), []byte(hashPasswordLegacy(candidate))) == 1
+	}
+
+	parts := strings.Split(stored, "$")
+	if len(parts) != 4 || parts[0] != passwordHashPrefix {
+		return false
+	}
+	iterations, err := strconv.Atoi(parts[1])
+	if err != nil || iterations <= 0 {
+		return false
+	}
+	salt, err := hex.DecodeString(parts[2])
+	if err != nil || len(salt) == 0 {
+		return false
+	}
+	want, err := hex.DecodeString(parts[3])
+	if err != nil || len(want) == 0 {
+		return false
+	}
+
+	got, err := pbkdf2.Key(sha256.New, candidate, salt, iterations, len(want))
+	if err != nil {
+		return false
+	}
+	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
 type Storage struct {
@@ -72,10 +161,14 @@ type Storage struct {
 }
 
 func InitStorage(dbPath string) (*Storage, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	// WAL meningkatkan konkurensi baca/tulis; busy_timeout mencegah kegagalan
+	// "database is locked" seketika saat ada penulis lain.
+	dsn := dbPath + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membuka database sqlite: %w", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	createSchema := `
 	CREATE TABLE IF NOT EXISTS audit_logs (
@@ -139,6 +232,18 @@ func InitStorage(dbPath string) (*Storage, error) {
 	_, _ = db.Exec("ALTER TABLE document_registry ADD COLUMN username TEXT DEFAULT ''")
 	_, _ = db.Exec("ALTER TABLE users ADD COLUMN specimen_signature TEXT DEFAULT ''")
 	_, _ = db.Exec("ALTER TABLE users ADD COLUMN signing_passphrase_hash TEXT DEFAULT ''")
+	_, _ = db.Exec("ALTER TABLE users ADD COLUMN vault_credential TEXT DEFAULT 'password'")
+
+	indexes := []string{
+		`CREATE INDEX IF NOT EXISTS idx_activity_category_level ON system_activity_logs (category, level)`,
+		`CREATE INDEX IF NOT EXISTS idx_activity_id_desc ON system_activity_logs (id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_registry_username ON document_registry (username)`,
+	}
+	for _, stmt := range indexes {
+		if _, err := db.Exec(stmt); err != nil {
+			return nil, fmt.Errorf("gagal membuat indeks database: %w", err)
+		}
+	}
 
 	s := &Storage{db: db}
 	s.seedInitialData()
@@ -231,9 +336,16 @@ func (s *Storage) CreateUser(u *User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `INSERT OR REPLACE INTO users (id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, created_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := s.db.Exec(query, u.ID, u.Username, u.PasswordHash, u.FullName, u.NikNip, u.Institution, u.Email, u.Role, u.MldsaPublicKey, u.MldsaPrivateKey, u.CreatedAt)
+	cred := u.VaultCredential
+	if cred == "" {
+		cred = VaultCredentialPassword
+	}
+
+	// INSERT biasa, bukan INSERT OR REPLACE: tabrakan id atau username wajib
+	// memunculkan error, bukan menimpa akun pengguna lain tanpa jejak.
+	query := `INSERT INTO users (id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, vault_credential, created_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := s.db.Exec(query, u.ID, u.Username, u.PasswordHash, u.FullName, u.NikNip, u.Institution, u.Email, u.Role, u.MldsaPublicKey, u.MldsaPrivateKey, cred, u.CreatedAt)
 	return err
 }
 
@@ -241,14 +353,40 @@ func (s *Storage) GetUserByUsername(username string) (*User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `SELECT id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, COALESCE(specimen_signature, ''), COALESCE(signing_passphrase_hash, ''), created_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, fullname, nik_nip, institution, email, role, mldsa_public_key, mldsa_private_key, COALESCE(specimen_signature, ''), COALESCE(signing_passphrase_hash, ''), COALESCE(vault_credential, 'password'), created_at FROM users WHERE username = ?`
 	var u User
-	err := s.db.QueryRow(query, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.MldsaPrivateKey, &u.SpecimenSignature, &u.SigningPassphraseHash, &u.CreatedAt)
+	err := s.db.QueryRow(query, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.NikNip, &u.Institution, &u.Email, &u.Role, &u.MldsaPublicKey, &u.MldsaPrivateKey, &u.SpecimenSignature, &u.SigningPassphraseHash, &u.VaultCredential, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	u.HasPassphrase = (u.SigningPassphraseHash != "")
+	if u.VaultCredential == "" {
+		u.VaultCredential = VaultCredentialPassword
+	}
 	return &u, nil
+}
+
+// UpdateUserPasswordHash memperbarui hanya hash kata sandi, dipakai untuk migrasi
+// transparan dari format hash lama ke format bersalt setelah login berhasil.
+func (s *Storage) UpdateUserPasswordHash(username, newPassHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`UPDATE users SET password_hash = ? WHERE username = ?`, newPassHash, username)
+	return err
+}
+
+// UpdateUserVault menyimpan vault kunci privat baru beserta kredensial pembungkusnya.
+func (s *Storage) UpdateUserVault(username, encPrivateKey, credential string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if credential != VaultCredentialPassword && credential != VaultCredentialPassphrase {
+		return fmt.Errorf("kredensial vault tidak dikenal: %s", credential)
+	}
+	_, err := s.db.Exec(`UPDATE users SET mldsa_private_key = ?, vault_credential = ? WHERE username = ?`,
+		encPrivateKey, credential, username)
+	return err
 }
 
 func (s *Storage) UpdateUserPassphrase(username, passHash string) error {

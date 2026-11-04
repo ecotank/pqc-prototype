@@ -6,21 +6,21 @@ import (
 )
 
 type DualSignResult struct {
-	Mode             string      `json:"mode"`
-	MLDSAResult      *SignResult `json:"mldsa"`
-	RSAResult        *RSASignResult `json:"rsa"`
-	TotalDurationMs  float64     `json:"total_duration_ms"`
-	TargetCompliant  bool        `json:"target_compliant"` // =< 2000 ms
-	TotalSizeBytes   int         `json:"total_size_bytes"`
+	Mode            string         `json:"mode"`
+	MLDSAResult     *SignResult    `json:"mldsa"`
+	RSAResult       *RSASignResult `json:"rsa"`
+	TotalDurationMs float64        `json:"total_duration_ms"`
+	TargetCompliant bool           `json:"target_compliant"` // =< 2000 ms
+	TotalSizeBytes  int            `json:"total_size_bytes"`
 }
 
 type DualVerifyResult struct {
-	Mode             string        `json:"mode"`
-	BothValid        bool          `json:"both_valid"`
+	Mode              string        `json:"mode"`
+	BothValid         bool          `json:"both_valid"`
 	MLDSAVerification *VerifyResult `json:"mldsa_verification"`
 	RSAVerification   *VerifyResult `json:"rsa_verification"`
-	TotalDurationMs  float64       `json:"total_duration_ms"`
-	Summary          string        `json:"summary"`
+	TotalDurationMs   float64       `json:"total_duration_ms"`
+	Summary           string        `json:"summary"`
 }
 
 func SignDual(mldsaAlg string, mldsaSK []byte, rsaSK []byte, message []byte, hashType string) (*DualSignResult, error) {

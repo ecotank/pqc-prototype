@@ -40,6 +40,7 @@ const app = createApp({
       // Onboarding Passphrase Setup
       showPassphraseSetupModal: false,
       passphraseForm: {
+        account_password: '',
         passphrase: '',
         confirm_passphrase: '',
         error: '',
@@ -515,6 +516,9 @@ const app = createApp({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: this.currentUser.username,
+            // Kata sandi akun diperlukan server untuk membuka vault kunci privat
+            // lalu membungkusnya ulang dengan passphrase penandatanganan.
+            password: p.account_password || this.loginForm.password,
             passphrase: p.passphrase
           })
         });
@@ -522,6 +526,8 @@ const app = createApp({
         if (res.ok && json.status === 'SUCCESS') {
           this.currentUser.has_passphrase = true;
           sessionStorage.setItem('arsign_user', JSON.stringify(this.currentUser));
+          p.account_password = '';
+          this.loginForm.password = '';
           this.showPassphraseSetupModal = false;
           this.showToast('Passphrase penandatanganan TTE berhasil diaktifkan!', 'success');
           this.currentScreen = 'app';
@@ -1201,22 +1207,9 @@ const app = createApp({
         const receiptUUID = 'ARS-TTE-' + Math.floor(100000 + Math.random() * 900000);
         const signerFullName = this.currentUser.fullname;
         const signerEmail = this.currentUser.email;
-        let signerPrivKey = (this.currentUser && this.currentUser.mldsa_private_key) || (this.mldsaKey ? this.mldsaKey.private_key_hex : '');
-        let signerPubKey = (this.currentUser && this.currentUser.mldsa_public_key) || (this.mldsaKey ? this.mldsaKey.public_key_hex : '');
-
-        if (!signerPrivKey || !signerPubKey) {
-          try {
-            const keyRes = await fetch('/api/v1/keys/generate?algorithm=ML-DSA-65', { method: 'POST' });
-            const keyJson = await keyRes.json();
-            if (keyJson && keyJson.data) {
-              this.mldsaKey = keyJson.data;
-              signerPrivKey = keyJson.data.private_key_hex;
-              signerPubKey = keyJson.data.public_key_hex;
-            }
-          } catch (e) {
-            console.warn('Fallback key generation:', e);
-          }
-        }
+        // Material kunci penandatanganan tidak pernah berada di peramban.
+        // Server membuka vault kunci privat memakai passphrase yang dikirim di
+        // bawah, lalu menandatangani atas nama akun yang sedang masuk.
 
         // 1. Sematkan visualisasi spesimen / stempel QR Code / mode invisible
         if (window.PDFSigner) {
@@ -1259,10 +1252,6 @@ const app = createApp({
             receipt_id: receiptUUID,
             username: this.currentUser ? this.currentUser.username : '',
             passphrase: this.signingPassphraseInput,
-            mldsa_private_key: signerPrivKey,
-            mldsa_public_key: signerPubKey,
-            signer_mldsa_privkey: signerPrivKey,
-            signer_mldsa_pubkey: signerPubKey,
             dual_sign: this.enableDualSign
           })
         });

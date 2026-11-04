@@ -6,6 +6,7 @@
 *.dylib
 pqc-server
 pqc-cli
+arsign-linux
 
 # Database & Runtime State
 *.db
@@ -24,14 +25,22 @@ tmp/
 .DS_Store
 Thumbs.db
 
-
 # Environment Secrets & Private Keys
 .env
 *.key
+*.pem
+
+# Material Otoritas Sertifikasi: dibangkitkan saat runtime, JANGAN pernah di-commit
+ca_keys/
 crypto/ca_keys/
+
+# Salinan sertifikat CA yang ditulis ulang oleh `go test ./crypto`
+crypto/ARSIGN_*.crt
+crypto/ARSIGN_*.pem
+
+# Artefak pengujian
 test_functional_*
 test_output_*
 test_input_*
 *.bin
 *.p7s
-arsign-linux

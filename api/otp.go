@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,8 +40,11 @@ type VerifyOTPReq struct {
 
 func init() {
 	loadEnvFile(".env")
+	go pruneExpiredOTPs()
 }
 
+// loadEnvFile memuat berkas .env. Variabel yang SUDAH ada di lingkungan proses
+// tidak ditimpa, agar konfigurasi kontainer/CI tetap menang atas berkas lokal.
 func loadEnvFile(path string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -57,22 +61,41 @@ func loadEnvFile(path string) {
 			k := strings.TrimSpace(parts[0])
 			v := strings.TrimSpace(parts[1])
 			v = strings.Trim(v, `"'`)
-			os.Setenv(k, v)
+			if _, exists := os.LookupEnv(k); !exists {
+				_ = os.Setenv(k, v)
+			}
 		}
 	}
 }
 
-func generateOTPCode() string {
+// generateOTPCode membangkitkan kode OTP 6 digit dari CSPRNG. Kegagalan CSPRNG
+// dilaporkan sebagai error; cadangan lama berbasis jam sistem dapat ditebak.
+func generateOTPCode() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(900000))
 	if err != nil {
-		return fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+		return "", fmt.Errorf("gagal membangkitkan kode OTP: %w", err)
 	}
-	return fmt.Sprintf("%06d", n.Int64()+100000)
+	return fmt.Sprintf("%06d", n.Int64()+100000), nil
+}
+
+// pruneExpiredOTPs membersihkan entri OTP kedaluwarsa secara berkala. Tanpa ini
+// peta otpStore tumbuh tanpa batas selama proses hidup.
+func pruneExpiredOTPs() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		now := time.Now()
+		otpMu.Lock()
+		for email, entry := range otpStore {
+			if now.After(entry.ExpiresAt) {
+				delete(otpStore, email)
+			}
+		}
+		otpMu.Unlock()
+	}
 }
 
 func sendOTPViaEmail(recipientEmail, code string) error {
-	loadEnvFile(".env")
-
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
 	if smtpPort == "" {
@@ -275,11 +298,23 @@ func (h *APIHandler) HandleAuthSendOTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	code := generateOTPCode()
+	code, err := generateOTPCode()
+	if err != nil {
+		otpMu.Unlock()
+		SendError(w, http.StatusInternalServerError, "Gagal membangkitkan kode verifikasi")
+		return
+	}
+
+	// Penghitung percobaan dibawa serta: kirim ulang OTP tidak boleh dipakai
+	// untuk mengembalikan jatah percobaan menjadi nol dan menerobos batas 3 kali.
+	attempts := 0
+	if prev, exists := otpStore[email]; exists && time.Now().Before(prev.ExpiresAt) {
+		attempts = prev.Attempts
+	}
 	otpStore[email] = OTPEntry{
 		Code:      code,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
-		Attempts:  0,
+		Attempts:  attempts,
 		LastSent:  time.Now(),
 	}
 	otpMu.Unlock()
@@ -325,7 +360,7 @@ func (h *APIHandler) HandleAuthVerifyOTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if entry.Code != code {
+	if subtle.ConstantTimeCompare([]byte(entry.Code), []byte(code)) != 1 {
 		entry.Attempts++
 		if entry.Attempts >= 3 {
 			delete(otpStore, email)
@@ -357,8 +392,15 @@ func (h *APIHandler) HandleAuthVerifyOTP(w http.ResponseWriter, r *http.Request)
 	}, "Verifikasi email berhasil")
 }
 
-// HandleAuthTestInspectOTP mengizinkan automated test lokal membaca OTP tanpa bocor ke UI
+// HandleAuthTestInspectOTP mengizinkan pengujian otomatis lokal membaca kode OTP.
+// Rute ini hanya didaftarkan bila diaktifkan eksplisit (lihat RegisterRoutes);
+// pemeriksaan berikut adalah lapis kedua agar kode OTP tidak mungkin bocor
+// walau rute terdaftar karena kekeliruan konfigurasi.
 func (h *APIHandler) HandleAuthTestInspectOTP(w http.ResponseWriter, r *http.Request) {
+	if !IsTestEndpointsEnabled() {
+		SendError(w, http.StatusNotFound, "Endpoint tidak tersedia")
+		return
+	}
 	email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
 	otpMu.RLock()
 	entry, exists := otpStore[email]
@@ -373,4 +415,3 @@ func (h *APIHandler) HandleAuthTestInspectOTP(w http.ResponseWriter, r *http.Req
 		"code":  entry.Code,
 	}, "OTP entry retrieved for testing")
 }
-

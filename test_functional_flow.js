@@ -1,198 +1,248 @@
-// test_functional_flow.js - Uji Fungsional Lengkap Alur Pengguna Baru & TTE ISO 32000-1
+// test_functional_flow.js — Uji fungsional alur pengguna baru ARSign:
+// verifikasi email OTP, pendaftaran akun, penyetelan passphrase TTE,
+// penandatanganan PAdES, lalu verifikasi dokumen.
+//
+// Alamat server dapat diatur lewat BASE_URL, contoh:
+//   BASE_URL=http://localhost:9080 node test_functional_flow.js
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:8080';
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arsign-fn-'));
+
+async function postJson(url, payload) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json().catch(function () { return null; });
+  return { res: res, json: json };
+}
+
+const FALLBACK_PDF = [
+  '%PDF-1.7',
+  '1 0 obj',
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  'endobj',
+  '2 0 obj',
+  '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  'endobj',
+  '3 0 obj',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>',
+  'endobj',
+  'xref',
+  '0 4',
+  '0000000000 65535 f ',
+  '0000000009 00000 n ',
+  '0000000058 00000 n ',
+  '0000000115 00000 n ',
+  'trailer',
+  '<< /Size 4 /Root 1 0 R >>',
+  'startxref',
+  '187',
+  '%%EOF'
+].join('\n');
+
 async function main() {
   console.log('================================================================');
-  console.log(' PENGUJIAN FUNGSIONAL LENGKAP: ALUR PENGGUNA BARU & TTE PQC ARSIGN');
+  console.log(' UJI FUNGSIONAL: ALUR PENGGUNA BARU & TTE ARSIGN');
+  console.log(' Server: ' + BASE_URL);
   console.log('================================================================\n');
 
-  // 1. Uji Endpoint Key Generation Backend (NIST FIPS 204 ML-DSA-65)
-  console.log('[TAHAP 1] MENGUJI GENERASI KUNCI PQC ML-DSA-65 (NIST FIPS 204)...');
-  const keyGenRes = await fetchJson('http://localhost:8080/api/v1/keys/generate', { method: 'POST' });
-  if (keyGenRes.status !== 'SUCCESS' || !keyGenRes.data || !keyGenRes.data.public_key_hex || !keyGenRes.data.private_key_hex) {
-    throw new Error('Gagal membangkitkan kunci ML-DSA-65: ' + JSON.stringify(keyGenRes));
-  }
-  const keyPair = keyGenRes.data;
-  console.log('  ✓ Algoritma Kriptografi  : ' + keyPair.algorithm);
-  console.log('  ✓ Public Key Bytes       : ' + (keyPair.public_key_hex.length/2) + ' bytes (FIPS 204: 1952 bytes)');
-  console.log('  ✓ Private Key Bytes      : ' + (keyPair.private_key_hex.length/2) + ' bytes (FIPS 204: 4032 bytes)');
-  console.log('  ✓ Durasi Pembangkitan    : ' + keyPair.gen_duration_ms + ' ms');
-
-  // 2. Simulasi 4 Tahap Onboarding Pengguna Baru
-  console.log('\n[TAHAP 2] SIMULASI PENDAFTARAN & REGISTRASI PENGGUNA BARU...');
-  // Step 1: Email + OTP Real Dispatch via API
-  const email = 'signer@smallcircle.web.id';
-  
-  const sendResp = await fetch('http://localhost:8080/api/v1/auth/otp/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
-  });
-  const sendData = await sendResp.json();
-  if (!sendResp.ok || sendData.status !== 'SUCCESS') {
-    throw new Error('Gagal mengirim OTP via API: ' + JSON.stringify(sendData));
-  }
-  console.log(`  [Step 1] Request OTP ke Email: ${email} -> Server: ${sendData.message}`);
-
-  const inspectResp = await fetch(`http://localhost:8080/api/v1/auth/otp/test-inspect?email=${encodeURIComponent(email)}`);
-  const inspectData = await inspectResp.json();
-  const dispatchedOtp = inspectData.data.code;
-  console.log(`  [Step 1] OTP Masuk ke Mailbox (${email}): ${dispatchedOtp} (Tidak ditampilkan di halaman UI)`);
-
-  const verifyResp = await fetch('http://localhost:8080/api/v1/auth/otp/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, code: dispatchedOtp })
-  });
-  const verifyData = await verifyResp.json();
-  if (!verifyResp.ok || verifyData.status !== 'SUCCESS') {
-    throw new Error('Verifikasi OTP via API gagal: ' + JSON.stringify(verifyData));
-  }
-  console.log('  [Step 1] Verifikasi OTP via API: LULUS (Email Terverifikasi Resmi)');
-
-  // Step 2: Data Pribadi & Spesimen Tanda Tangan
-  const dummyUser = {
-    id: 'USR-TEST-' + Math.floor(100000 + Math.random() * 900000),
-    username: 'raden.haryo',
+  const id = crypto.randomBytes(4).toString('hex');
+  const account = {
+    username: 'raden.haryo.' + id,
+    password: 'KataSandi@' + id,
+    passphrase: 'RahasiaKripto@' + id,
     fullname: 'Dr. Raden Haryo Wicaksono, M.Cs.',
     nik_nip: '3271012304850005',
     institution: 'ARSign Trust Network',
-    email: email,
-    password: 'Password@2026',
-    passphrase: 'RahasiaKripto2026!',
-    mldsa_public_key: keyPair.public_key_hex,
-    mldsa_private_key: keyPair.private_key_hex
+    email: 'signer.' + id + '@smallcircle.web.id'
   };
-  console.log(`  [Step 2] Profil KTP Lengkap: ${dummyUser.fullname} (NIK: ${dummyUser.nik_nip})`);
 
-  // Step 3: Passphrase & Passkey Biometrik
-  console.log(`  [Step 3] Passphrase Disetel: ${dummyUser.passphrase}`);
-  console.log('  [Step 3] Passkey Biometrik Wajah: Snapshot Tersimpan');
-
-  // Step 4: Penerbitan Sertifikat & Aktivasi
-  console.log(`  [Step 4] Penerbitan Kunci & Sertifikat ML-DSA-65 Selesai! ID: ${dummyUser.id}`);
-
-  // 3. Uji Penandatanganan PAdES ISO 32000-1 dengan Kunci Pengguna Baru
-  console.log('\n[TAHAP 3] EKSEKUSI TTE PAdES ISO 32000-1 DENGAN KREDENSIAL PENGGUNA BARU...');
-  let samplePdf;
-  if (fs.existsSync('test_input_clean.pdf')) {
-    samplePdf = fs.readFileSync('test_input_clean.pdf');
-  } else {
-    samplePdf = Buffer.from('%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n187\n%%EOF');
+  // [TAHAP 1] Verifikasi alamat surel melalui OTP
+  console.log('[TAHAP 1] VERIFIKASI ALAMAT SUREL MELALUI OTP...');
+  const send = await postJson(BASE_URL + '/api/v1/auth/otp/send', { email: account.email });
+  if (!send.res.ok || !send.json || send.json.status !== 'SUCCESS') {
+    throw new Error('Pengiriman OTP gagal: ' + JSON.stringify(send.json));
   }
-  const b64Pdf = samplePdf.toString('base64');
+  console.log('  Permintaan OTP ke ' + account.email + ' -> ' + send.json.message);
 
-  const padesReq = {
-    pdf_base64: b64Pdf,
-    signer_fullname: dummyUser.fullname,
-    signer_email: dummyUser.email,
-    signer_nik: dummyUser.nik_nip,
-    institution: dummyUser.institution,
-    receipt_id: 'ARS-REC-' + Date.now(),
-    mldsa_private_key: dummyUser.mldsa_private_key,
-    mldsa_public_key: dummyUser.mldsa_public_key
-  };
+  const inspectRes = await fetch(BASE_URL + '/api/v1/auth/otp/test-inspect?email=' + encodeURIComponent(account.email));
+  if (inspectRes.status === 404) {
+    throw new Error('Endpoint bantu uji OTP tidak tersedia. Jalankan server dengan ARSIGN_ENABLE_TEST_ENDPOINTS=1 dan APP_ENV selain "production".');
+  }
+  const inspect = await inspectRes.json();
+  if (!inspect || inspect.status !== 'SUCCESS' || !inspect.data || !inspect.data.code) {
+    throw new Error('Kode OTP tidak dapat dibaca: ' + JSON.stringify(inspect));
+  }
+  const otpCode = inspect.data.code;
+  console.log('  Kode OTP diterbitkan (tidak pernah ditampilkan di antarmuka publik)');
 
-  const signRes = await fetchJson('http://localhost:8080/api/v1/pades/sign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(padesReq)
+  // Kode salah wajib ditolak dan mengurangi jatah percobaan
+  const wrongOtp = await postJson(BASE_URL + '/api/v1/auth/otp/verify', {
+    email: account.email,
+    code: otpCode === '000000' ? '111111' : '000000'
   });
-
-  if (signRes.status !== 'SUCCESS' || !signRes.data) {
-    throw new Error('Gagal menandatangani PAdES: ' + JSON.stringify(signRes));
+  if (wrongOtp.res.ok) {
+    throw new Error('Kode OTP salah seharusnya ditolak');
   }
+  console.log('  Kode OTP salah ditolak (HTTP ' + wrongOtp.res.status + ')');
 
-  const signData = signRes.data;
-  console.log('  ✓ TTE Berhasil Diterapkan!');
-  console.log('  ✓ Tanda Terima ARSign      : ' + signData.receipt_id);
-  console.log('  ✓ Ukuran Signature ML-DSA: ' + (signData.mldsa_signature_hex.length/2) + ' bytes (FIPS 204: 3309 bytes)');
-  console.log('  ✓ Kontainer PKCS#7       : ' + (signData.pkcs7_signature_hex.length/2) + ' bytes');
-  console.log('  ✓ Waktu Komputasi        : ' + signData.duration_ms + ' ms');
+  const verifyOtp = await postJson(BASE_URL + '/api/v1/auth/otp/verify', {
+    email: account.email,
+    code: otpCode
+  });
+  if (!verifyOtp.res.ok || !verifyOtp.json || verifyOtp.json.status !== 'SUCCESS') {
+    throw new Error('Verifikasi OTP gagal: ' + JSON.stringify(verifyOtp.json));
+  }
+  console.log('  Verifikasi OTP LULUS');
 
-  const signedPdfBuf = Buffer.from(signData.pdf_base64, 'hex');
+  // Kode yang sama tidak boleh dapat dipakai ulang
+  const replay = await postJson(BASE_URL + '/api/v1/auth/otp/verify', {
+    email: account.email,
+    code: otpCode
+  });
+  if (replay.res.ok) {
+    throw new Error('Kode OTP yang sudah terpakai seharusnya tidak dapat dipakai ulang');
+  }
+  console.log('  Pemakaian ulang kode OTP ditolak (HTTP ' + replay.res.status + ')\n');
+
+  // [TAHAP 2] Pendaftaran akun & penerbitan sertifikat elektronik
+  console.log('[TAHAP 2] PENDAFTARAN AKUN & PENERBITAN SERTIFIKAT...');
+  const reg = await postJson(BASE_URL + '/api/v1/auth/register', {
+    fullname: account.fullname,
+    username: account.username,
+    password: account.password,
+    nik_nip: account.nik_nip,
+    institution: account.institution,
+    email: account.email,
+    role: 'ASN'
+  });
+  if (!reg.json || reg.json.status !== 'SUCCESS') {
+    throw new Error('Pendaftaran akun gagal: ' + JSON.stringify(reg.json));
+  }
+  if (reg.json.data.mldsa_private_key || reg.json.data.password_hash) {
+    throw new Error('KEBOCORAN: respons pendaftaran memuat material rahasia');
+  }
+  console.log('  Akun ' + reg.json.data.username + ' terdaftar (ID ' + reg.json.data.id + ')');
+  console.log('  Ukuran kunci publik: ' + (reg.json.data.mldsa_public_key.length / 2) + ' byte\n');
+
+  // [TAHAP 3] Penyetelan passphrase penandatanganan
+  console.log('[TAHAP 3] PENYETELAN PASSPHRASE PENANDATANGANAN...');
+  const wrongSet = await postJson(BASE_URL + '/api/v1/auth/passphrase/set', {
+    username: account.username,
+    password: 'KataSandiSalah123',
+    passphrase: account.passphrase
+  });
+  if (wrongSet.res.status !== 401) {
+    throw new Error('Penyetelan passphrase dengan kata sandi salah seharusnya ditolak 401, diperoleh ' + wrongSet.res.status);
+  }
+  console.log('  Penyetelan tanpa kata sandi akun yang benar ditolak 401');
+
+  const setPass = await postJson(BASE_URL + '/api/v1/auth/passphrase/set', {
+    username: account.username,
+    password: account.password,
+    passphrase: account.passphrase
+  });
+  if (!setPass.json || setPass.json.status !== 'SUCCESS') {
+    throw new Error('Penyetelan passphrase gagal: ' + JSON.stringify(setPass.json));
+  }
+  console.log('  Passphrase penandatanganan aktif\n');
+
+  // [TAHAP 4] Penandatanganan PAdES ISO 32000-1
+  console.log('[TAHAP 4] PENANDATANGANAN PAdES ISO 32000-1...');
+  const samplePdf = fs.existsSync('test_input_clean.pdf')
+    ? fs.readFileSync('test_input_clean.pdf')
+    : Buffer.from(FALLBACK_PDF, 'utf-8');
+
+  const sign = await postJson(BASE_URL + '/api/v1/pades/sign', {
+    pdf_base64: samplePdf.toString('base64'),
+    receipt_id: 'ARS-REC-' + id,
+    username: account.username,
+    passphrase: account.passphrase
+  });
+  if (!sign.json || sign.json.status !== 'SUCCESS') {
+    throw new Error('Penandatanganan PAdES gagal: ' + JSON.stringify(sign.json));
+  }
+  const signData = sign.json.data;
+  console.log('  Tanda terima        : ' + signData.receipt_id);
+  console.log('  Ukuran tanda tangan : ' + (signData.mldsa_signature_hex.length / 2) + ' byte');
+  console.log('  Kontainer PKCS#7    : ' + (signData.pkcs7_signature_hex.length / 2) + ' byte');
+  console.log('  Waktu komputasi     : ' + signData.duration_ms + ' ms');
+
+  const signedPdfBuf = Buffer.from(signData.signed_pdf_hex || signData.pdf_base64,
+    signData.signed_pdf_hex ? 'hex' : 'base64');
   fs.writeFileSync('test_functional_signed.pdf', signedPdfBuf);
-  console.log('  ✓ Dokumen Hasil Tersimpan: test_functional_signed.pdf (' + signedPdfBuf.length + ' bytes)');
+  console.log('  Dokumen tersimpan   : test_functional_signed.pdf (' + signedPdfBuf.length + ' byte)\n');
 
-  // 4. Verifikasi Matematis & Kriptografis ISO 32000-1 PAdES
-  console.log('\n[TAHAP 4] VERIFIKASI MATEMATIS & KRIPTOGRAFIS HASIL PAdES...');
+  // [TAHAP 5] Verifikasi matematis & kriptografis
+  console.log('[TAHAP 5] VERIFIKASI MATEMATIS & KRIPTOGRAFIS...');
   const str = signedPdfBuf.toString('latin1');
 
-  // a. ByteRange Math
   const brMatch = str.match(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/);
-  if (!brMatch) throw new Error('ByteRange tidak ditemukan pada PDF hasil penandatanganan!');
-  const [_, o1, l1, o2, l2] = brMatch.map(Number);
-  console.log(`  ✓ Nilai ByteRange: [${o1}, ${l1}, ${o2}, ${l2}]`);
-  const holeSize = o2 - l1;
-  const totalCovered = l1 + l2;
-  const expectedCovered = signedPdfBuf.length - holeSize;
-  if (totalCovered !== expectedCovered) {
-    throw new Error(`ByteRange span tidak presisi: total=${totalCovered}, expected=${expectedCovered}`);
+  if (!brMatch) throw new Error('/ByteRange tidak ditemukan pada dokumen hasil');
+  const o1 = Number(brMatch[1]);
+  const l1 = Number(brMatch[2]);
+  const o2 = Number(brMatch[3]);
+  const l2 = Number(brMatch[4]);
+  if (l1 + l2 !== signedPdfBuf.length - (o2 - l1)) {
+    throw new Error('ByteRange tidak presisi: total=' + (l1 + l2) + ', diharapkan=' + (signedPdfBuf.length - (o2 - l1)));
   }
-  console.log(`  ✓ ByteRange Exactness Match: Mencakup 100% byte dokumen kecuali alokasi kontainer.`);
+  console.log('  ByteRange [' + o1 + ', ' + l1 + ', ' + o2 + ', ' + l2 + '] presisi');
 
-  // b. ByteRange SHA-256 Digest Verification
-  const part1 = signedPdfBuf.subarray(o1, o1 + l1);
-  const part2 = signedPdfBuf.subarray(o2, o2 + l2);
-  const docHash = crypto.createHash('sha256').update(Buffer.concat([part1, part2])).digest('hex');
+  const combined = Buffer.concat([
+    signedPdfBuf.subarray(o1, o1 + l1),
+    signedPdfBuf.subarray(o2, o2 + l2)
+  ]);
+  const docHash = crypto.createHash('sha256').update(combined).digest('hex');
   if (docHash !== signData.document_hash) {
-    throw new Error(`Digest dokumen tidak cocok! Dihitung: ${docHash}, Backend: ${signData.document_hash}`);
+    throw new Error('Digest dokumen tidak cocok. Dihitung: ' + docHash + ', backend: ' + signData.document_hash);
   }
-  console.log(`  ✓ ByteRange SHA-256 Digest: ${docHash} (Presisi 100%)`);
+  console.log('  Digest SHA-256 ByteRange cocok dengan backend');
 
-  // c. PKCS#7 Extraction & OpenSSL Verification
   const contentsMatch = str.match(/\/Contents\s*<([0-9A-Fa-f]+)>/);
-  if (!contentsMatch) throw new Error('/Contents tidak ditemukan!');
-  const pkcs7Hex = contentsMatch[1].substring(0, signData.pkcs7_signature_hex.length);
-  fs.writeFileSync('test_functional_pkcs7.p7s', Buffer.from(pkcs7Hex, 'hex'));
+  if (!contentsMatch) throw new Error('/Contents tidak ditemukan');
+  const p7File = path.join(tmpDir, 'functional.p7s');
+  fs.writeFileSync(p7File, Buffer.from(contentsMatch[1].replace(/0+$/, ''), 'hex'));
 
-  const certsText = execSync('openssl pkcs7 -in test_functional_pkcs7.p7s -inform DER -print_certs -text', { encoding: 'utf-8' });
-  const hasSigner = certsText.includes('Dr. Raden Haryo Wicaksono');
-  const hasSubCA = certsText.includes('ARSign Sub-CA Pelayanan TTE Pascakuantum');
-  const hasRootCA = certsText.includes('ARSign Root CA');
-  console.log(`  ✓ Sertifikat Penanda Tangan (${dummyUser.fullname}): ${hasSigner ? 'TERVERIFIKASI' : 'GAGAL'}`);
-  console.log(`  ✓ Rantai ARSign Sub-CA Pelayanan TTE               : ${hasSubCA ? 'TERVERIFIKASI' : 'GAGAL'}`);
-  console.log(`  ✓ Rantai ARSign Root CA                         : ${hasRootCA ? 'TERVERIFIKASI' : 'GAGAL'}`);
+  const certsText = execSync('openssl pkcs7 -in "' + p7File + '" -inform DER -print_certs -text', { encoding: 'utf-8' });
+  const chain = [
+    ['Sertifikat penanda tangan (' + account.fullname + ')', certsText.indexOf('Raden Haryo Wicaksono') !== -1],
+    ['Rantai ARSign Sub-CA', certsText.indexOf('ARSign Sub-CA Pelayanan TTE Pascakuantum') !== -1],
+    ['Rantai ARSign Root CA', certsText.indexOf('ARSign Root CA') !== -1]
+  ];
+  chain.forEach(function (c) {
+    console.log('  ' + c[0] + ': ' + (c[1] ? 'TERVERIFIKASI' : 'GAGAL'));
+    if (!c[1]) throw new Error('Verifikasi rantai sertifikat X.509 gagal: ' + c[0]);
+  });
 
-  if (!hasSigner || !hasSubCA || !hasRootCA) {
-    throw new Error('Verifikasi rantai sertifikat X.509 gagal!');
+  const verify = await postJson(BASE_URL + '/api/v1/pades/verify', {
+    pdf_base64: signedPdfBuf.toString('base64')
+  });
+  if (!verify.json || verify.json.status !== 'SUCCESS' || !verify.json.data.is_valid) {
+    throw new Error('Verifikasi dokumen gagal: ' + JSON.stringify(verify.json && verify.json.data));
   }
+  console.log('  Identitas pada sertifikat: ' + verify.json.data.signer_fullname);
+  if (verify.json.data.signer_fullname !== account.fullname) {
+    throw new Error('Identitas sertifikat tidak sesuai registri akun');
+  }
+  console.log('  Verifikasi API: SAH (' + verify.json.data.valid_signatures + '/' + verify.json.data.total_signatures + ')\n');
 
-  console.log('\n================================================================');
-  console.log(' HASIL AKHIR: SELURUH PENGUJIAN FUNGSIONAL LULUS 100% (SUKSES)   ');
+  console.log('================================================================');
+  console.log(' HASIL AKHIR: SELURUH PENGUJIAN FUNGSIONAL LULUS');
   console.log('================================================================');
 }
 
-function fetchJson(url, options = {}) {
-  const http = require('http');
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = http.request({
-      hostname: u.hostname,
-      port: u.port,
-      path: u.pathname + u.search,
-      method: options.method || 'GET',
-      headers: options.headers || {}
-    }, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(body));
-        } catch (e) {
-          resolve({ status: 'ERROR', raw: body });
-        }
-      });
-    });
-    req.on('error', reject);
-    if (options.body) req.write(options.body);
-    req.end();
+main()
+  .catch(function (err) {
+    console.error('\n[FATAL ERROR]', err.message);
+    process.exitCode = 1;
+  })
+  .finally(function () {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
-}
-
-main().catch(err => {
-  console.error('\n[FATAL ERROR]', err.message);
-  process.exit(1);
-});

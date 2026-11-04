@@ -16,15 +16,15 @@ import (
 )
 
 type RSAKeyPairResult struct {
-	Algorithm       string  `json:"algorithm"`
-	KeyBits         int     `json:"key_bits"`
-	PublicKeyHex    string  `json:"public_key_hex"`
-	PublicKeyBase64 string  `json:"public_key_base64"`
-	PrivateKeyHex   string  `json:"private_key_hex"`
-	PrivateKeyBase64 string `json:"private_key_base64"`
-	PublicKeyBytes  int     `json:"public_key_bytes"`
-	PrivateKeyBytes int     `json:"private_key_bytes"`
-	GenDurationMs   float64 `json:"gen_duration_ms"`
+	Algorithm        string  `json:"algorithm"`
+	KeyBits          int     `json:"key_bits"`
+	PublicKeyHex     string  `json:"public_key_hex"`
+	PublicKeyBase64  string  `json:"public_key_base64"`
+	PrivateKeyHex    string  `json:"private_key_hex"`
+	PrivateKeyBase64 string  `json:"private_key_base64"`
+	PublicKeyBytes   int     `json:"public_key_bytes"`
+	PrivateKeyBytes  int     `json:"private_key_bytes"`
+	GenDurationMs    float64 `json:"gen_duration_ms"`
 }
 
 func GenerateRSAKeyPair(bits int) (*RSAKeyPairResult, error) {
@@ -47,15 +47,15 @@ func GenerateRSAKeyPair(bits int) (*RSAKeyPairResult, error) {
 
 	algName := fmt.Sprintf("RSA-%d", bits)
 	return &RSAKeyPairResult{
-		Algorithm:       algName,
-		KeyBits:         bits,
-		PublicKeyHex:    hex.EncodeToString(pubKeyBytes),
-		PublicKeyBase64: base64.StdEncoding.EncodeToString(pubKeyBytes),
-		PrivateKeyHex:   hex.EncodeToString(privKeyBytes),
+		Algorithm:        algName,
+		KeyBits:          bits,
+		PublicKeyHex:     hex.EncodeToString(pubKeyBytes),
+		PublicKeyBase64:  base64.StdEncoding.EncodeToString(pubKeyBytes),
+		PrivateKeyHex:    hex.EncodeToString(privKeyBytes),
 		PrivateKeyBase64: base64.StdEncoding.EncodeToString(privKeyBytes),
-		PublicKeyBytes:  len(pubKeyBytes),
-		PrivateKeyBytes: len(privKeyBytes),
-		GenDurationMs:   float64(duration.Microseconds()) / 1000.0,
+		PublicKeyBytes:   len(pubKeyBytes),
+		PrivateKeyBytes:  len(privKeyBytes),
+		GenDurationMs:    float64(duration.Microseconds()) / 1000.0,
 	}, nil
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -446,22 +447,35 @@ func (h *APIHandler) HandleUpdatePassword(w http.ResponseWriter, r *http.Request
 		SendError(w, http.StatusBadRequest, "Permintaan tidak valid: "+err.Error())
 		return
 	}
+	if strings.TrimSpace(req.NewPassword) == "" {
+		SendError(w, http.StatusBadRequest, "Kata sandi baru wajib diisi")
+		return
+	}
+
 	user, err := h.store.GetUserByUsername(req.Username)
-	if err != nil || user.PasswordHash != storage.HashPassword(req.OldPassword) {
+	if err != nil || !storage.VerifyPassword(user.PasswordHash, req.OldPassword) {
 		SendError(w, http.StatusUnauthorized, "Kata sandi lama tidak sesuai")
 		return
 	}
-	rawPrivKey, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, req.OldPassword)
-	if err != nil {
-		SendError(w, http.StatusInternalServerError, "Gagal membuka vault kunci privat: "+err.Error())
-		return
-	}
-	newEncKey, err := crypto.EncryptPrivateKey(rawPrivKey, req.NewPassword)
-	if err != nil {
-		SendError(w, http.StatusInternalServerError, "Gagal mengenkripsi kunci dengan kata sandi baru")
-		return
-	}
-	if err := h.store.UpdateUserPassword(req.Username, storage.HashPassword(req.NewPassword), newEncKey); err != nil {
+
+	// Vault hanya perlu dibungkus ulang bila kata sandi akun memang pembungkusnya.
+	// Bila vault dibungkus passphrase penandatanganan, isinya tidak tersentuh.
+	if user.VaultCredential == storage.VaultCredentialPassword {
+		rawPrivKey, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, req.OldPassword)
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, "Gagal membuka vault kunci privat: "+err.Error())
+			return
+		}
+		newEncKey, err := crypto.EncryptPrivateKey(rawPrivKey, req.NewPassword)
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, "Gagal mengenkripsi kunci dengan kata sandi baru")
+			return
+		}
+		if err := h.store.UpdateUserPassword(user.Username, storage.HashPassword(req.NewPassword), newEncKey); err != nil {
+			SendError(w, http.StatusInternalServerError, "Gagal memperbarui kata sandi: "+err.Error())
+			return
+		}
+	} else if err := h.store.UpdateUserPasswordHash(user.Username, storage.HashPassword(req.NewPassword)); err != nil {
 		SendError(w, http.StatusInternalServerError, "Gagal memperbarui kata sandi: "+err.Error())
 		return
 	}
@@ -576,6 +590,7 @@ func (h *APIHandler) HandleUpdateSpecimen(w http.ResponseWriter, r *http.Request
 
 type PassphraseReq struct {
 	Username   string `json:"username"`
+	Password   string `json:"password"`
 	Passphrase string `json:"passphrase"`
 }
 
@@ -594,11 +609,44 @@ func (h *APIHandler) HandleSetPassphrase(w http.ResponseWriter, r *http.Request)
 		SendError(w, http.StatusNotFound, "Pengguna tidak ditemukan")
 		return
 	}
-	hPass := storage.HashPassword(req.Passphrase)
-	if err := h.store.UpdateUserPassphrase(user.Username, hPass); err != nil {
+
+	// Membuka vault kunci privat butuh kredensial pembungkusnya saat ini.
+	currentCredential := req.Password
+	if user.VaultCredential == storage.VaultCredentialPassphrase {
+		// Penggantian passphrase: pemilik wajib membuktikan passphrase lama.
+		if !storage.VerifyPassword(user.SigningPassphraseHash, req.Password) {
+			_ = h.store.RecordActivity("SECURITY", "WARN", user.Username, "SET_PASSPHRASE_REJECTED", "Permintaan ganti passphrase ditolak: kredensial lama salah", r.RemoteAddr, r.UserAgent())
+			SendError(w, http.StatusUnauthorized, "Passphrase penandatanganan saat ini tidak sesuai")
+			return
+		}
+	} else if !storage.VerifyPassword(user.PasswordHash, req.Password) {
+		_ = h.store.RecordActivity("SECURITY", "WARN", user.Username, "SET_PASSPHRASE_REJECTED", "Permintaan setel passphrase ditolak: kata sandi akun salah", r.RemoteAddr, r.UserAgent())
+		SendError(w, http.StatusUnauthorized, "Kata sandi akun tidak sesuai")
+		return
+	}
+
+	rawPrivKey, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, currentCredential)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal membuka vault kunci privat: "+err.Error())
+		return
+	}
+
+	// Setelah passphrase aktif, vault dibungkus passphrase penandatanganan sehingga
+	// penandatanganan dapat dilakukan sepenuhnya di sisi server.
+	newEncKey, err := crypto.EncryptPrivateKey(rawPrivKey, req.Passphrase)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal mengamankan kunci privat dengan passphrase: "+err.Error())
+		return
+	}
+	if err := h.store.UpdateUserVault(user.Username, newEncKey, storage.VaultCredentialPassphrase); err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal menyimpan vault kunci privat: "+err.Error())
+		return
+	}
+	if err := h.store.UpdateUserPassphrase(user.Username, storage.HashPassword(req.Passphrase)); err != nil {
 		SendError(w, http.StatusInternalServerError, "Gagal menyimpan passphrase: "+err.Error())
 		return
 	}
+
 	_ = h.store.RecordActivity("AUTH", "INFO", user.Username, "SET_PASSPHRASE_SUCCESS", "Passphrase penandatanganan berhasil disetel", r.RemoteAddr, r.UserAgent())
 	SendSuccess(w, map[string]interface{}{"success": true, "has_passphrase": true}, "Passphrase penandatanganan TTE berhasil diaktifkan")
 }
@@ -622,7 +670,7 @@ func (h *APIHandler) HandleVerifyPassphrase(w http.ResponseWriter, r *http.Reque
 		SendError(w, http.StatusBadRequest, "Passphrase penandatanganan belum disetel untuk akun ini")
 		return
 	}
-	if user.SigningPassphraseHash != storage.HashPassword(req.Passphrase) {
+	if !storage.VerifyPassword(user.SigningPassphraseHash, req.Passphrase) {
 		_ = h.store.RecordActivity("SECURITY", "WARN", user.Username, "VERIFY_PASSPHRASE_FAILED", "Otorisasi penandatanganan gagal: passphrase salah", r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusUnauthorized, "Passphrase penandatanganan salah")
 		return
@@ -744,6 +792,7 @@ func (h *APIHandler) seedDefaultUsers() {
 			Role:            d.Role,
 			MldsaPublicKey:  keyRes.PublicKeyHex,
 			MldsaPrivateKey: encPrivKey,
+			VaultCredential: storage.VaultCredentialPassword,
 			CreatedAt:       time.Now().Format("2006-01-02 15:04:05"),
 		})
 	}
@@ -767,23 +816,35 @@ func (h *APIHandler) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.PasswordHash != storage.HashPassword(req.Password) {
+	if !storage.VerifyPassword(user.PasswordHash, req.Password) {
 		_ = h.store.RecordActivity("SECURITY", "WARN", req.Username, "AUTH_LOGIN_FAILED", "Percobaan login gagal (kata sandi salah)", r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusUnauthorized, "Nama pengguna atau kata sandi salah")
 		return
 	}
 
+	// Migrasi transparan hash kata sandi format lama ke format bersalt.
+	if storage.IsLegacyPasswordHash(user.PasswordHash) {
+		if err := h.store.UpdateUserPasswordHash(user.Username, storage.HashPassword(req.Password)); err == nil {
+			_ = h.store.RecordActivity("SECURITY", "INFO", user.Username, "PASSWORD_HASH_UPGRADED", "Hash kata sandi dimigrasikan ke format bersalt", r.RemoteAddr, r.UserAgent())
+		}
+	}
+
+	// Enkripsi ulang vault lama ke format penurunan kunci baru bila pembungkusnya
+	// masih kata sandi akun.
+	if crypto.IsVaultLegacyFormat(user.MldsaPrivateKey) && user.VaultCredential == storage.VaultCredentialPassword {
+		if raw, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, req.Password); err == nil {
+			if reEnc, err := crypto.EncryptPrivateKey(raw, req.Password); err == nil {
+				_ = h.store.UpdateUserVault(user.Username, reEnc, storage.VaultCredentialPassword)
+			}
+		}
+	}
+
 	_ = h.store.RecordAudit("AuthLogin", "ML-DSA-65", 0, "SUCCESS", fmt.Sprintf("Pengguna %s (%s) berhasil masuk", user.Username, user.FullName))
 	_ = h.store.RecordActivity("AUTH", "INFO", user.Username, "AUTH_LOGIN_SUCCESS", fmt.Sprintf("Pengguna %s (%s) berhasil masuk ke sistem", user.Username, user.FullName), r.RemoteAddr, r.UserAgent())
 
-	// Dekripsi kunci privat ML-DSA menggunakan kata sandi pengguna secara in-memory
-	if decKey, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, req.Password); err == nil {
-		user.MldsaPrivateKey = decKey
-	}
-
-	user.PasswordHash = ""
-	user.SigningPassphraseHash = ""
-	SendSuccess(w, user, "Berhasil masuk ke layanan")
+	// Kunci privat TTE tidak pernah meninggalkan server. Sebelumnya kunci privat
+	// ML-DSA didekripsi lalu dikirim ke peramban dan disimpan di sessionStorage.
+	SendSuccess(w, sanitizeUser(user), "Berhasil masuk ke layanan")
 }
 
 type RegisterReq struct {
@@ -830,7 +891,11 @@ func (h *APIHandler) HandleAuthRegister(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	newID := fmt.Sprintf("USR-%s-%d", role, time.Now().Unix()%1000000)
+	newID, err := newUserID(role)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Gagal membangkitkan identitas akun: "+err.Error())
+		return
+	}
 	user := &storage.User{
 		ID:              newID,
 		Username:        strings.ToLower(strings.TrimSpace(req.Username)),
@@ -842,6 +907,7 @@ func (h *APIHandler) HandleAuthRegister(w http.ResponseWriter, r *http.Request) 
 		Role:            role,
 		MldsaPublicKey:  keyRes.PublicKeyHex,
 		MldsaPrivateKey: encPrivKey,
+		VaultCredential: storage.VaultCredentialPassword,
 		CreatedAt:       time.Now().Format("2006-01-02 15:04:05"),
 	}
 
@@ -854,33 +920,69 @@ func (h *APIHandler) HandleAuthRegister(w http.ResponseWriter, r *http.Request) 
 	_ = h.store.RecordAudit("AuthRegister", "ML-DSA-65", 0, "SUCCESS", fmt.Sprintf("Registrasi akun baru %s (%s)", user.Username, user.FullName))
 	_ = h.store.RecordActivity("AUTH", "INFO", user.Username, "AUTH_REGISTER_SUCCESS", fmt.Sprintf("Akun baru %s (%s, NIK: %s) terdaftar dengan sertifikat ML-DSA-65", user.Username, user.FullName, user.NikNip), r.RemoteAddr, r.UserAgent())
 
-	user.PasswordHash = ""
-	user.MldsaPrivateKey = keyRes.PrivateKeyHex // Kembalikan ke pengguna untuk sesi lokal saat ini
-	SendSuccess(w, user, "Akun berhasil didaftarkan bersama kunci ML-DSA-65")
+	// Kunci privat tetap berada di vault server; hanya kunci publik dipublikasikan.
+	SendSuccess(w, sanitizeUser(user), "Akun berhasil didaftarkan bersama sertifikat elektroniknya")
 }
 
+// HandleAuthUsersList mengembalikan daftar pengguna. Endpoint ini memuat NIK/NIP
+// dan alamat surel seluruh pengguna, sehingga hanya boleh diakses administrator.
 func (h *APIHandler) HandleAuthUsersList(w http.ResponseWriter, r *http.Request) {
 	list, err := h.store.GetUsersList()
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	SendSuccess(w, list, "")
+	sanitized := make([]*storage.User, 0, len(list))
+	for i := range list {
+		sanitized = append(sanitized, sanitizeUser(&list[i]))
+	}
+	SendSuccess(w, sanitized, "")
 }
 
+// sanitizeUser menghapus seluruh material rahasia dari objek pengguna sebelum
+// dikirim sebagai respons API (AGENTS.md bagian 4.4).
+func sanitizeUser(u *storage.User) *storage.User {
+	if u == nil {
+		return nil
+	}
+	clone := *u
+	clone.PasswordHash = ""
+	clone.SigningPassphraseHash = ""
+	clone.MldsaPrivateKey = ""
+	return &clone
+}
+
+// newReceiptID membangkitkan nomor tanda terima TTE dari CSPRNG. Nomor lama
+// memakai time.Now().UnixNano()%1000000 sehingga mudah ditebak dan dapat bertabrakan.
+func newReceiptID() (string, error) {
+	buf := make([]byte, 6)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return "ARS-TTE-" + strings.ToUpper(hex.EncodeToString(buf)), nil
+}
+
+// newUserID membangkitkan identitas akun dari CSPRNG. Identitas lama memakai
+// time.Now().Unix()%1000000 sehingga dua pendaftaran pada detik yang sama
+// menghasilkan id identik.
+func newUserID(role string) (string, error) {
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("USR-%s-%s", strings.ToUpper(role), hex.EncodeToString(buf)), nil
+}
+
+// PAdESSignRequest hanya memuat berkas, identitas akun, dan kredensial pembuka
+// vault. Identitas penanda tangan TIDAK lagi diambil dari badan permintaan:
+// sebelumnya siapa pun dapat menandatangani sebagai nama dan NIK apa pun tanpa
+// kredensial, dan material kunci kiriman klien dipakai apa adanya.
 type PAdESSignRequest struct {
-	PDFBase64          string `json:"pdf_base64"`
-	SignerFullName     string `json:"signer_fullname"`
-	SignerEmail        string `json:"signer_email"`
-	SignerNIK          string `json:"signer_nik"`
-	Institution        string `json:"institution"`
-	ReceiptID          string `json:"receipt_id"`
-	MLDSAPrivateKey    string `json:"mldsa_private_key"`
-	MLDSAPublicKey     string `json:"mldsa_public_key"`
-	SignerMLDSAPrivKey string `json:"signer_mldsa_privkey"`
-	SignerMLDSAPubKey  string `json:"signer_mldsa_pubkey"`
-	Username           string `json:"username"`
-	Passphrase         string `json:"passphrase"`
+	PDFBase64  string `json:"pdf_base64"`
+	ReceiptID  string `json:"receipt_id"`
+	Username   string `json:"username"`
+	Passphrase string `json:"passphrase"`
+	Password   string `json:"password"`
 }
 
 type PAdESSignResponse struct {
@@ -917,94 +1019,90 @@ func (h *APIHandler) HandlePAdESSign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Dukung alias field name signer_mldsa_privkey / signer_mldsa_pubkey
-	if req.MLDSAPrivateKey == "" && req.SignerMLDSAPrivKey != "" {
-		req.MLDSAPrivateKey = req.SignerMLDSAPrivKey
-	}
-	if req.MLDSAPublicKey == "" && req.SignerMLDSAPubKey != "" {
-		req.MLDSAPublicKey = req.SignerMLDSAPubKey
-	}
-
-	// 2. Validasi passphrase dan ambil data akun jika ada username
-	if req.Username != "" {
-		if u, err := h.store.GetUserByUsername(req.Username); err == nil {
-			if u.SigningPassphraseHash != "" {
-				if req.Passphrase == "" || u.SigningPassphraseHash != storage.HashPassword(req.Passphrase) {
-					_ = h.store.RecordActivity("SECURITY", "WARN", req.Username, "SIGN_PASSPHRASE_REJECTED", "Penandatanganan dibatalkan: passphrase tidak valid", r.RemoteAddr, r.UserAgent())
-					SendError(w, http.StatusUnauthorized, "Otorisasi gagal: Passphrase penandatanganan tidak valid")
-					return
-				}
-			}
-			if req.MLDSAPrivateKey == "" {
-				req.MLDSAPrivateKey = u.MldsaPrivateKey
-			}
-			if req.MLDSAPublicKey == "" {
-				req.MLDSAPublicKey = u.MldsaPublicKey
-			}
-			if req.SignerFullName == "" {
-				req.SignerFullName = u.FullName
-			}
-			if req.SignerEmail == "" {
-				req.SignerEmail = u.Email
-			}
-			if req.SignerNIK == "" {
-				req.SignerNIK = u.NikNip
-			}
-			if req.Institution == "" {
-				req.Institution = u.Institution
-			}
-		}
-	}
-
-	// 3. Jika kunci privat berstatus terenkripsi (ENC:...), dekripsi secara otomatis
-	if strings.HasPrefix(req.MLDSAPrivateKey, "ENC:") {
-		for _, pass := range []string{"arsign2026", "", "arsign-default-vault-key-2026"} {
-			if dec, err := crypto.DecryptPrivateKey(req.MLDSAPrivateKey, pass); err == nil && dec != "" && !strings.HasPrefix(dec, "ENC:") {
-				req.MLDSAPrivateKey = dec
-				break
-			}
-		}
-		if strings.HasPrefix(req.MLDSAPrivateKey, "ENC:") {
-			req.MLDSAPrivateKey = ""
-		}
-	}
-
-	// 4. Jika masih kosong, bangkitkan kunci sesi resmi agar penandatanganan tidak gagal
-	if req.MLDSAPrivateKey == "" || req.MLDSAPublicKey == "" {
-		if keyPair, err := crypto.GenerateMLDSAKeyPair("ML-DSA-65"); err == nil {
-			req.MLDSAPrivateKey = keyPair.PrivateKeyHex
-			req.MLDSAPublicKey = keyPair.PublicKeyHex
-		}
-	}
-
-	mldsaPriv, err := crypto.DecodeHexOrBase64(req.MLDSAPrivateKey)
-	if err != nil || len(mldsaPriv) == 0 {
-		SendError(w, http.StatusBadRequest, "Kunci privat tidak valid: "+err.Error())
+	// 1. Penandatanganan wajib atas nama akun terdaftar.
+	username := strings.ToLower(strings.TrimSpace(req.Username))
+	if username == "" {
+		SendError(w, http.StatusUnauthorized, "Otorisasi gagal: penandatanganan hanya dapat dilakukan oleh akun terdaftar")
 		return
 	}
 
-	mldsaPub, err := crypto.DecodeHexOrBase64(req.MLDSAPublicKey)
-	if err != nil || len(mldsaPub) == 0 {
-		SendError(w, http.StatusBadRequest, "Kunci publik tidak valid: "+err.Error())
+	user, err := h.store.GetUserByUsername(username)
+	if err != nil {
+		_ = h.store.RecordActivity("SECURITY", "WARN", username, "SIGN_UNKNOWN_ACCOUNT", "Penandatanganan ditolak: akun tidak terdaftar", r.RemoteAddr, r.UserAgent())
+		SendError(w, http.StatusUnauthorized, "Otorisasi gagal: kredensial penandatanganan tidak valid")
 		return
 	}
 
-	if req.ReceiptID == "" {
-		req.ReceiptID = fmt.Sprintf("ARS-TTE-%d", time.Now().UnixNano()%1000000)
+	// 2. Verifikasi kredensial pembuka vault kunci privat.
+	var vaultCredential string
+	if user.VaultCredential == storage.VaultCredentialPassphrase {
+		if !storage.VerifyPassword(user.SigningPassphraseHash, req.Passphrase) {
+			_ = h.store.RecordActivity("SECURITY", "WARN", user.Username, "SIGN_PASSPHRASE_REJECTED", "Penandatanganan dibatalkan: passphrase tidak valid", r.RemoteAddr, r.UserAgent())
+			SendError(w, http.StatusUnauthorized, "Otorisasi gagal: Passphrase penandatanganan tidak valid")
+			return
+		}
+		vaultCredential = req.Passphrase
+	} else {
+		if !storage.VerifyPassword(user.PasswordHash, req.Password) {
+			_ = h.store.RecordActivity("SECURITY", "WARN", user.Username, "SIGN_PASSWORD_REJECTED", "Penandatanganan dibatalkan: kata sandi akun tidak valid", r.RemoteAddr, r.UserAgent())
+			SendError(w, http.StatusUnauthorized, "Otorisasi gagal: akun ini belum menyetel passphrase penandatanganan. Sertakan kata sandi akun, atau setel passphrase terlebih dahulu.")
+			return
+		}
+		vaultCredential = req.Password
+	}
+
+	// 3. Buka vault kunci privat di sisi server. Tidak ada lagi percobaan
+	//    passphrase hardcoded, dan tidak ada lagi pembangkitan kunci sesi acak
+	//    sebagai cadangan — keduanya meruntuhkan nirpenyangkalan.
+	privKeyHex, err := crypto.DecryptPrivateKey(user.MldsaPrivateKey, vaultCredential)
+	if err != nil {
+		_ = h.store.RecordActivity("ERROR", "ERROR", user.Username, "SIGN_VAULT_UNLOCK_FAILED", "Vault kunci privat gagal dibuka", r.RemoteAddr, r.UserAgent())
+		SendError(w, http.StatusInternalServerError, "Gagal membuka vault kunci privat penandatanganan")
+		return
+	}
+
+	mldsaPriv, err := crypto.DecodeHexOrBase64(privKeyHex)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Kunci privat tersimpan tidak valid: "+err.Error())
+		return
+	}
+	if len(mldsaPriv) == 0 {
+		SendError(w, http.StatusInternalServerError, "Kunci privat tersimpan kosong")
+		return
+	}
+
+	mldsaPub, err := crypto.DecodeHexOrBase64(user.MldsaPublicKey)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, "Kunci publik tersimpan tidak valid: "+err.Error())
+		return
+	}
+	if len(mldsaPub) == 0 {
+		SendError(w, http.StatusInternalServerError, "Kunci publik tersimpan kosong")
+		return
+	}
+
+	// 4. Identitas pada sertifikat diambil dari registri akun, bukan dari permintaan.
+	receiptID := strings.TrimSpace(req.ReceiptID)
+	if receiptID == "" {
+		receiptID, err = newReceiptID()
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, "Gagal membangkitkan nomor tanda terima: "+err.Error())
+			return
+		}
 	}
 
 	signedPDF, res, err := crypto.SignPDFPAdES(pdfRaw, crypto.PAdESSignOptions{
-		SignerFullName:   req.SignerFullName,
-		SignerEmail:      req.SignerEmail,
-		SignerNIK:        req.SignerNIK,
-		Institution:      req.Institution,
-		ReceiptID:        req.ReceiptID,
-		MLDSAPrivateKey:  mldsaPriv,
-		MLDSAPublicKey:   mldsaPub,
+		SignerFullName:  user.FullName,
+		SignerEmail:     user.Email,
+		SignerNIK:       user.NikNip,
+		Institution:     user.Institution,
+		ReceiptID:       receiptID,
+		MLDSAPrivateKey: mldsaPriv,
+		MLDSAPublicKey:  mldsaPub,
 	})
 	if err != nil {
 		_ = h.store.RecordAudit("PAdESSign", "ML-DSA-65+RSA", 0, "FAILED", err.Error())
-		_ = h.store.RecordActivity("ERROR", "ERROR", req.SignerFullName, "PAdES_SIGN_FAILED", err.Error(), r.RemoteAddr, r.UserAgent())
+		_ = h.store.RecordActivity("ERROR", "ERROR", user.Username, "PAdES_SIGN_FAILED", err.Error(), r.RemoteAddr, r.UserAgent())
 		SendError(w, http.StatusInternalServerError, "Gagal menandatangani PAdES ISO 32000-1: "+err.Error())
 		return
 	}
@@ -1060,11 +1158,29 @@ func (h *APIHandler) HandlePAdESVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.store.IsCertificateRevoked(res.CertSerialNumber) {
+	// Pencabutan diperiksa pada SETIAP revisi tanda tangan. Sebelumnya hanya
+	// nomor seri penanda tangan terakhir yang diperiksa, sehingga dokumen dengan
+	// penanda tangan pertama yang sertifikatnya sudah dicabut tetap lolos.
+	serials := res.CertSerialNumbers
+	if len(serials) == 0 {
+		serials = []string{res.CertSerialNumber}
+	}
+	var revoked []string
+	for _, sn := range serials {
+		if sn != "" && h.store.IsCertificateRevoked(sn) {
+			revoked = append(revoked, sn)
+		}
+	}
+	if len(revoked) > 0 {
 		res.IsRevoked = true
 		res.IsValid = false
-		res.Message = "DOKUMEN DITOLAK: Sertifikat elektronik penanda tangan telah dicabut resmi (Revoked)!"
+		if len(serials) > 1 {
+			res.Message = fmt.Sprintf("DOKUMEN DITOLAK: %d dari %d sertifikat elektronik penanda tangan pada dokumen ini telah dicabut resmi (Revoked)!", len(revoked), len(serials))
+		} else {
+			res.Message = "DOKUMEN DITOLAK: Sertifikat elektronik penanda tangan telah dicabut resmi (Revoked)!"
+		}
 		res.IntegrityStatus = res.Message
+		_ = h.store.RecordActivity("SECURITY", "WARN", res.SignerFullName, "PAdES_VERIFY_REVOKED", fmt.Sprintf("Verifikasi menolak dokumen: %d sertifikat tercabut", len(revoked)), r.RemoteAddr, r.UserAgent())
 	}
 
 	statusStr := "SUCCESS"
@@ -1103,8 +1219,8 @@ func (h *APIHandler) HandleCACertificates(w http.ResponseWriter, r *http.Request
 	}
 
 	SendSuccess(w, map[string]interface{}{
-		"ca_name":     "ARSign Root & Sub-CA Trust Network",
-		"chain_pem":   ca.ExportPEMCertificates(),
+		"ca_name":   "ARSign Root & Sub-CA Trust Network",
+		"chain_pem": ca.ExportPEMCertificates(),
 		"root_ca": CACertInfo{
 			Subject:      ca.RootCert.Subject.String(),
 			Issuer:       ca.RootCert.Issuer.String(),
@@ -1137,8 +1253,12 @@ func (h *APIHandler) HandleCACRL(w http.ResponseWriter, r *http.Request) {
 
 	var pkixRevoked []pkix.RevokedCertificate
 	for _, entry := range revokedEntries {
-		sn := new(big.Int)
-		sn.SetString(entry.SerialNumber, 10)
+		sn, ok := new(big.Int).SetString(entry.SerialNumber, 10)
+		if !ok {
+			// Serial rusak dulu diam-diam menjadi 0 di dalam CRL.
+			_ = h.store.RecordActivity("ERROR", "WARN", "SYSTEM", "CRL_SERIAL_INVALID", fmt.Sprintf("Nomor seri sertifikat tercabut tidak valid dan dilewati: %q", entry.SerialNumber), r.RemoteAddr, r.UserAgent())
+			continue
+		}
 		t, err := time.Parse("2006-01-02 15:04:05", entry.RevocationDate)
 		if err != nil {
 			t = time.Now()
@@ -1208,4 +1328,3 @@ func (h *APIHandler) HandleCARevoke(w http.ResponseWriter, r *http.Request) {
 		"revocation_time": time.Now().Format(time.RFC3339),
 	}, "Sertifikat elektronik berhasil dicabut resmi")
 }
-

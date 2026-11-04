@@ -54,9 +54,19 @@ Agar pekerjaan tidak saling menimpa (*conflict*):
 ---
 
 ## 4. Testing & Verifikasi Kode
-Sebelum push, selalu pastikan fitur berjalan dengan script pengujian otomatis:
+Sebelum push, selalu pastikan fitur berjalan dengan pengujian berikut:
 ```bash
-node scratch/test_live_functional.js
+go vet ./...
+go test ./...
+# dengan server berjalan di :8080
+node test_e2e_pades.js
 ```
-Jika seluruh indikator menunjukkan `[PASS]`, kode kamu aman dan siap digabungkan.
+Jika semua lulus (E2E menampilkan `ALL 5 PAdES TESTS PASSED`), kode kamu siap digabungkan.
+Catatan: `go test` menulis ulang `crypto/ARSIGN_*.crt|pem`; pulihkan dengan `git restore crypto/ARSIGN_*` sebelum commit.
+
+---
+
+## 5. Aturan Agen AI & Changelog Wajib
+- Aturan bersama untuk semua agen AI (Claude Code, Codex, Cursor, Gemini, dll.) ada di `AGENTS.md`. `CLAUDE.md` mengimpor file tersebut.
+- Setiap perubahan wajib dicatat rinci di `docs/changelog/<github-login>.md` (satu file per orang, entri terbaru di atas), di commit/PR yang sama dengan perubahannya. Template ada di `docs/changelog/README.md`.
 
