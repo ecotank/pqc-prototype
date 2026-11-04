@@ -57,9 +57,10 @@ func RegisterRoutes(mux *http.ServeMux, h *APIHandler) {
 	mux.HandleFunc("POST /api/v1/auth/otp/send", h.HandleAuthSendOTP)
 	mux.HandleFunc("POST /api/v1/auth/otp/verify", h.HandleAuthVerifyOTP)
 
-	// Endpoint bantu pengujian otomatis: membocorkan kode OTP, sehingga hanya
-	// didaftarkan di luar lingkungan produksi.
-	if !IsProductionEnv() {
+	// Endpoint bantu pengujian otomatis membocorkan kode OTP, sehingga pendaftarannya
+	// wajib diaktifkan secara eksplisit. Menggantungkannya pada "bukan produksi"
+	// bersifat fail-open: APP_ENV yang lupa disetel langsung membuka endpoint ini.
+	if IsTestEndpointsEnabled() {
 		mux.HandleFunc("GET /api/v1/auth/otp/test-inspect", h.HandleAuthTestInspectOTP)
 	}
 
@@ -83,6 +84,17 @@ const maxRequestBodyBytes = 32 << 20 // 32 MiB
 // IsProductionEnv melaporkan apakah layanan berjalan pada lingkungan produksi.
 func IsProductionEnv() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+}
+
+// IsTestEndpointsEnabled melaporkan apakah endpoint bantu pengujian boleh aktif.
+// Aktivasi bersifat opt-in lewat ARSIGN_ENABLE_TEST_ENDPOINTS dan tetap ditolak
+// mutlak pada lingkungan produksi.
+func IsTestEndpointsEnabled() bool {
+	if IsProductionEnv() {
+		return false
+	}
+	v := strings.TrimSpace(os.Getenv("ARSIGN_ENABLE_TEST_ENDPOINTS"))
+	return v == "1" || strings.EqualFold(v, "true")
 }
 
 // allowedOrigins mengembalikan daftar origin yang boleh memanggil API lintas asal.

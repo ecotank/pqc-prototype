@@ -4,6 +4,94 @@ Catatan rinci setiap perubahan oleh EzrDH. Format: lihat `README.md` di folder i
 
 ---
 
+## [2026-11-04] Tindak lanjut tinjauan keamanan: gerbang fail-open, Incremental Saving Attack, dan pencabutan per penanda tangan
+
+- **Branch**: `fix/security-audit-hardening`
+- **Commit/PR**: (belum di-commit)
+- **Agen AI**: Claude Code
+- **Jenis**: fix
+
+### Ringkasan
+Tinjauan keamanan otomatis atas commit `5506581` menemukan tiga cacat yang lolos
+dari audit sebelumnya: gerbang endpoint bantu uji bersifat fail-open, verifikasi
+PAdES masih dapat ditembus dengan menyisipkan revisi inkremental baru di belakang
+rentang yang ditandatangani, dan pemeriksaan pencabutan sertifikat hanya menyentuh
+penanda tangan terakhir. Ketiganya diperbaiki dan dikunci oleh uji regresi.
+
+### Alasan
+
+1. **Fail-open pada endpoint pembocor kode OTP (tinggi).**
+   `if !IsProductionEnv()` hanya memeriksa `APP_ENV == "production"`. Repo ini
+   tidak menyertakan `.env`, sehingga `APP_ENV` kosong pada pemasangan baru dan
+   `/api/v1/auth/otp/test-inspect` langsung aktif. Siapa pun yang tahu alamat
+   surel seorang penandatangan dapat membaca kode OTP-nya dan mengambil alih
+   akun. Keamanan tidak boleh bergantung pada variabel lingkungan yang lupa diisi.
+
+2. **Incremental Saving Attack (tinggi).** `VerifyPDFPAdES` tidak memastikan
+   cakupan tanda tangan terakhir mencapai akhir berkas. Penyerang dapat
+   menambahkan revisi inkremental baru di belakang `o1+l1`: byte tambahan itu
+   tidak tercakup tanda tangan mana pun, namun seluruh pemeriksaan tetap lulus
+   dan dokumen dinyatakan "Asli & Utuh". Pembaca PDF menampilkan revisi terakhir,
+   sehingga isi yang dilihat pengguna adalah isi kendali penyerang.
+   Dibuktikan langsung: dokumen hasil tanda tangan yang disisipi satu revisi
+   palsu sebelumnya membalas `is_valid: true`.
+
+3. **Pencabutan hanya diperiksa pada penanda tangan terakhir (sedang).**
+   `HandlePAdESVerify` memeriksa `res.CertSerialNumber`, yaitu nomor seri revisi
+   terakhir saja. Dokumen multi-signature yang penanda tangan pertamanya sudah
+   dicabut tetap dinyatakan sah.
+
+### Rincian Perubahan
+
+| File | Perubahan |
+|---|---|
+| `api/routes.go` | `IsTestEndpointsEnabled()` baru: aktivasi endpoint bantu uji bersifat opt-in lewat `ARSIGN_ENABLE_TEST_ENDPOINTS=1`, dan ditolak mutlak bila `APP_ENV=production`. Pendaftaran rute `otp/test-inspect` memakai gerbang ini, bukan lagi negasi `IsProductionEnv()`. |
+| `api/otp.go` | Lapis kedua pada `HandleAuthTestInspectOTP` ikut memakai `IsTestEndpointsEnabled()`. |
+| `crypto/pades.go` | `VerifyPDFPAdES` mewajibkan cakupan tanda tangan terakhir mencapai akhir berkas; hanya ruang kosong PDF (`isPDFWhitespace`) yang diperbolehkan sesudahnya. Field `HasUnsignedChanges` baru. Nomor seri sertifikat SETIAP revisi dikumpulkan ke `CertSerialNumbers`. |
+| `api/handlers.go` | Pemeriksaan pencabutan menelusuri seluruh nomor seri revisi; bila ada yang tercabut, dokumen ditolak, jumlahnya dilaporkan, dan peristiwa dicatat sebagai `PAdES_VERIFY_REVOKED`. |
+| `Dockerfile` | `APP_ENV=production` disetel sebagai nilai bawaan image. |
+| `.env.example` | `ARSIGN_ENABLE_TEST_ENDPOINTS=0` beserta peringatan eksplisit bahwa nilai 1 membocorkan kode OTP. |
+| `test_functional_flow.js` | Pesan bantuan menyebut `ARSIGN_ENABLE_TEST_ENDPOINTS=1` sebagai prasyarat. |
+| `crypto/pades_verify_test.go` | Tiga tes baru: penolakan revisi yang disisipkan setelah penandatanganan, toleransi ruang kosong di akhir berkas, dan pengumpulan nomor seri setiap revisi. |
+| `api/api_test.go` | Dua tes baru: endpoint bantu uji nonaktif tanpa opt-in (termasuk pemeriksaan bahwa respons tidak memuat kode OTP) dan penolakan dokumen ketika sertifikat penanda tangan PERTAMA dicabut. `TestOTPVerifyRejectsReplayAndWrongCode` mengaktifkan sakelar secara eksplisit. |
+
+### Dampak
+- **Konfigurasi baru:** `ARSIGN_ENABLE_TEST_ENDPOINTS`. Tanpa nilai `1`,
+  `/api/v1/auth/otp/test-inspect` membalas `404`. `test_functional_flow.js`
+  memerlukan sakelar ini saat dijalankan.
+- Image Docker kini default `APP_ENV=production`.
+- Respons verifikasi bertambah `has_unsigned_changes` dan `cert_serial_numbers`.
+- Dokumen yang pernah dianggap sah dan memuat revisi tak bertanda tangan kini
+  ditolak. Ini perubahan perilaku yang disengaja.
+
+### Pengujian
+- `go build ./...`, `go vet ./...`, `gofmt -l .` — bersih.
+- `go test -count=1 ./...` — lulus, **33 tes** (naik dari 28).
+- `node test_e2e_pades.js` — 12/12 lulus.
+- `node test_functional_flow.js` — lulus.
+- Bukti temuan 2 terhadap server hasil build: dokumen asli `is_valid=true`,
+  `has_unsigned_changes=false`; dokumen yang disisipi revisi `is_valid=false`,
+  `has_unsigned_changes=true`.
+- Bukti temuan 1: server dijalankan tanpa `APP_ENV` dan tanpa sakelar; permintaan
+  `GET /api/v1/auth/otp/test-inspect` membalas `404`.
+- Bukti temuan 3: `TestPAdESVerifyChecksRevocationOfEverySigner` mencabut
+  sertifikat penanda tangan pertama pada dokumen berlapis; verifikasi menolak.
+
+### Risiko & Catatan Lanjutan
+- Dua catatan dari entri sebelumnya masih berlaku dan tetap menunggu keputusan
+  manusia: rotasi kunci CA yang pernah bocor ke riwayat git, dan pencabutan token
+  bot Telegram lama lewat @BotFather.
+- Syarat cakupan sampai akhir berkas mengasumsikan penanda tangan terakhir selalu
+  menyegel seluruh berkas. Itu berlaku untuk dokumen yang ditandatangani ARSign.
+  Dokumen dari penerbit lain yang menyisakan byte bukan-ruang-kosong setelah
+  rentang tanda tangan akan ditolak; bila kelak perlu interoperabilitas, byte
+  tersebut harus diurai sebagai revisi PDF dan diperiksa apakah hanya memuat
+  perubahan yang diizinkan `/DocMDP`.
+- Pemeriksaan pencabutan masih hanya menyentuh sertifikat penanda tangan, belum
+  sertifikat perantara.
+
+---
+
 ## [2026-11-04] Audit menyeluruh: penutupan bypass verifikasi PAdES, autentikasi penandatanganan, dan pengerasan kredensial
 
 - **Branch**: `fix/security-audit-hardening`

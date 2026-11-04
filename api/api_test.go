@@ -304,6 +304,8 @@ func TestCORSMiddlewareRestrictsOrigin(t *testing.T) {
 }
 
 func TestOTPVerifyRejectsReplayAndWrongCode(t *testing.T) {
+	t.Setenv("ARSIGN_ENABLE_TEST_ENDPOINTS", "1")
+
 	h := newTestHandler(t)
 	const email = "otp.uji@smallcircle.web.id"
 
@@ -345,5 +347,105 @@ func TestOTPVerifyRejectsReplayAndWrongCode(t *testing.T) {
 	})
 	if rec.Code == http.StatusOK {
 		t.Fatal("kode OTP yang sudah terpakai seharusnya tidak dapat dipakai ulang")
+	}
+}
+
+// TestTestInspectOTPDisabledByDefault adalah uji regresi untuk pola fail-open:
+// gerbang lama hanya memeriksa "bukan produksi", sehingga APP_ENV yang lupa
+// disetel langsung membuka endpoint pembocor kode OTP.
+func TestTestInspectOTPDisabledByDefault(t *testing.T) {
+	t.Setenv("APP_ENV", "")
+	t.Setenv("ARSIGN_ENABLE_TEST_ENDPOINTS", "")
+
+	if IsTestEndpointsEnabled() {
+		t.Fatal("endpoint bantu uji seharusnya nonaktif tanpa aktivasi eksplisit")
+	}
+
+	h := newTestHandler(t)
+	rec, _ := doJSON(t, h.HandleAuthSendOTP, http.MethodPost, "/api/v1/auth/otp/send",
+		map[string]string{"email": "korban@smallcircle.web.id"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("pengiriman OTP gagal: %s", rec.Body.String())
+	}
+
+	// Rute tidak terdaftar, dan handler sendiri menolak sebagai lapis kedua.
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, h)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/otp/test-inspect?email=korban@smallcircle.web.id", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("rute bantu uji seharusnya tidak terdaftar (404), diperoleh %d", rec.Code)
+	}
+
+	rec, _ = doJSON(t, h.HandleAuthTestInspectOTP, http.MethodGet,
+		"/api/v1/auth/otp/test-inspect?email=korban@smallcircle.web.id", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("handler bantu uji seharusnya menolak (404), diperoleh %d", rec.Code)
+	}
+	// Field kode OTP berbentuk "code":"123456"; "status_code":404 tidak cocok.
+	if bytes.Contains(rec.Body.Bytes(), []byte(`"code":"`)) {
+		t.Fatal("respons tidak boleh memuat kode OTP")
+	}
+
+	// Produksi menolak mutlak walau sakelar diaktifkan.
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("ARSIGN_ENABLE_TEST_ENDPOINTS", "1")
+	if IsTestEndpointsEnabled() {
+		t.Fatal("produksi seharusnya menolak endpoint bantu uji tanpa syarat")
+	}
+}
+
+// TestPAdESVerifyChecksRevocationOfEverySigner adalah uji regresi untuk
+// pemeriksaan pencabutan yang dulu hanya menyentuh penanda tangan terakhir.
+func TestPAdESVerifyChecksRevocationOfEverySigner(t *testing.T) {
+	h := newTestHandler(t)
+	username, _, passphrase := registerSigner(t, h)
+
+	// Tanda tangan pertama.
+	rec, body := doJSON(t, h.HandlePAdESSign, http.MethodPost, "/api/v1/pades/sign", map[string]string{
+		"pdf_base64": minimalPDFBase64(), "username": username, "passphrase": passphrase,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("penandatanganan pertama gagal: %s", rec.Body.String())
+	}
+	data, _ := body["data"].(map[string]any)
+	firstHex, _ := data["signed_pdf_hex"].(string)
+	firstSerial, _ := data["cert_serial_number"].(string)
+	if firstHex == "" || firstSerial == "" {
+		t.Fatal("respons penandatanganan pertama tidak lengkap")
+	}
+
+	// Tanda tangan kedua di atas dokumen yang sama.
+	rec, body = doJSON(t, h.HandlePAdESSign, http.MethodPost, "/api/v1/pades/sign", map[string]string{
+		"pdf_base64": firstHex, "username": username, "passphrase": passphrase,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("penandatanganan kedua gagal: %s", rec.Body.String())
+	}
+	data, _ = body["data"].(map[string]any)
+	multiHex, _ := data["signed_pdf_hex"].(string)
+
+	// Sebelum pencabutan: dokumen sah.
+	rec, body = doJSON(t, h.HandlePAdESVerify, http.MethodPost, "/api/v1/pades/verify",
+		map[string]string{"pdf_base64": multiHex})
+	vd, _ := body["data"].(map[string]any)
+	if rec.Code != http.StatusOK || vd["is_valid"] != true {
+		t.Fatalf("dokumen berlapis seharusnya sah sebelum pencabutan: %v", vd["message"])
+	}
+
+	// Cabut sertifikat penanda tangan PERTAMA saja.
+	if err := h.store.RevokeCertificate(firstSerial, "Pejabat Penandatangan Resmi, S.Kom.", "keyCompromise"); err != nil {
+		t.Fatalf("pencabutan sertifikat gagal: %v", err)
+	}
+
+	rec, body = doJSON(t, h.HandlePAdESVerify, http.MethodPost, "/api/v1/pades/verify",
+		map[string]string{"pdf_base64": multiHex})
+	vd, _ = body["data"].(map[string]any)
+	if vd["is_valid"] == true {
+		t.Fatalf("dokumen dengan sertifikat penanda tangan pertama yang dicabut seharusnya ditolak: %v", vd["message"])
+	}
+	if vd["is_revoked"] != true {
+		t.Fatal("status pencabutan seharusnya dilaporkan")
 	}
 }

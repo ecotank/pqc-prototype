@@ -30,7 +30,10 @@ USER arsign
 # 8080 portal produksi, 8081 visualisasi proses, 8082 layanan audit administrator
 EXPOSE 8080 8081 8082
 
-ENV PORT=8080 \
+# APP_ENV disetel produksi secara bawaan agar endpoint bantu pengujian tidak
+# mungkin aktif karena konfigurasi yang lupa diisi.
+ENV APP_ENV=production \
+    PORT=8080 \
     PORT_PROC=8081 \
     PORT_ADMIN=8082 \
     DB_PATH=/app/data/pqc_arsign.db \

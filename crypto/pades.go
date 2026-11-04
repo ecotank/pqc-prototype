@@ -667,6 +667,24 @@ type PAdESVerifyDetail struct {
 	IsPQCVerified    bool `json:"is_pqc_verified"`    // lapisan pascakuantum ikut terverifikasi
 	TotalSignatures  int  `json:"total_signatures"`   // jumlah revisi tanda tangan di dalam berkas
 	ValidSignatures  int  `json:"valid_signatures"`   // jumlah revisi yang lulus seluruh pemeriksaan
+
+	// HasUnsignedChanges menandai adanya byte di luar cakupan tanda tangan terakhir,
+	// yaitu revisi inkremental yang ditambahkan setelah dokumen ditandatangani.
+	HasUnsignedChanges bool `json:"has_unsigned_changes"`
+
+	// CertSerialNumbers memuat nomor seri sertifikat SETIAP revisi tanda tangan,
+	// agar pemeriksaan pencabutan tidak hanya menyentuh penanda tangan terakhir.
+	CertSerialNumbers []string `json:"cert_serial_numbers"`
+}
+
+// isPDFWhitespace melaporkan apakah byte termasuk pemisah ruang kosong PDF
+// (ISO 32000-1 Tabel 1).
+func isPDFWhitespace(b byte) bool {
+	switch b {
+	case 0x00, 0x09, 0x0a, 0x0c, 0x0d, 0x20:
+		return true
+	}
+	return false
 }
 
 // parseASN1DERLength membaca tag SEQUENCE dan length ASN.1 DER untuk memotong hex secara presisi tanpa merusak trailing byte
@@ -1011,6 +1029,7 @@ func VerifyPDFPAdES(pdfData []byte) (*PAdESVerifyDetail, error) {
 	var last *PAdESVerifyDetail
 	validCount := 0
 	var firstFailure *PAdESVerifyDetail
+	serials := make([]string, 0, len(ranges))
 
 	for idx, br := range ranges {
 		detail, err := verifySignatureRevision(pdfData, br)
@@ -1022,11 +1041,33 @@ func VerifyPDFPAdES(pdfData []byte) (*PAdESVerifyDetail, error) {
 		} else if firstFailure == nil {
 			firstFailure = detail
 		}
+		serials = append(serials, detail.CertSerialNumber)
 		last = detail
 	}
 
 	last.TotalSignatures = len(ranges)
 	last.ValidSignatures = validCount
+	last.CertSerialNumbers = serials
+
+	// Cakupan tanda tangan terakhir wajib mencapai akhir berkas. Tanpa syarat ini,
+	// penyerang dapat menambahkan revisi inkremental baru (isi halaman, anotasi)
+	// di belakang rentang yang ditandatangani: byte tambahan itu tidak tercakup
+	// tanda tangan mana pun, namun dokumen tetap dinyatakan asli dan utuh.
+	// Ini kelas serangan Incremental Saving Attack pada tanda tangan PDF.
+	lastRange := ranges[len(ranges)-1]
+	coverageEnd := lastRange.o1 + lastRange.l1
+	for _, b := range pdfData[coverageEnd:] {
+		if !isPDFWhitespace(b) {
+			last.HasUnsignedChanges = true
+			break
+		}
+	}
+	if last.HasUnsignedChanges {
+		last.IsValid = false
+		last.IntegrityStatus = "DOKUMEN TIDAK VALID: Terdapat perubahan yang ditambahkan setelah dokumen ditandatangani dan tidak tercakup tanda tangan mana pun."
+		last.Message = last.IntegrityStatus
+		return last, nil
+	}
 
 	if validCount != len(ranges) {
 		last.IsValid = false

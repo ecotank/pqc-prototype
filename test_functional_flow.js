@@ -74,7 +74,7 @@ async function main() {
 
   const inspectRes = await fetch(BASE_URL + '/api/v1/auth/otp/test-inspect?email=' + encodeURIComponent(account.email));
   if (inspectRes.status === 404) {
-    throw new Error('Endpoint bantu uji OTP tidak tersedia. Jalankan server dengan APP_ENV selain "production".');
+    throw new Error('Endpoint bantu uji OTP tidak tersedia. Jalankan server dengan ARSIGN_ENABLE_TEST_ENDPOINTS=1 dan APP_ENV selain "production".');
   }
   const inspect = await inspectRes.json();
   if (!inspect || inspect.status !== 'SUCCESS' || !inspect.data || !inspect.data.code) {

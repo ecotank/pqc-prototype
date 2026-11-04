@@ -1158,11 +1158,29 @@ func (h *APIHandler) HandlePAdESVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.store.IsCertificateRevoked(res.CertSerialNumber) {
+	// Pencabutan diperiksa pada SETIAP revisi tanda tangan. Sebelumnya hanya
+	// nomor seri penanda tangan terakhir yang diperiksa, sehingga dokumen dengan
+	// penanda tangan pertama yang sertifikatnya sudah dicabut tetap lolos.
+	serials := res.CertSerialNumbers
+	if len(serials) == 0 {
+		serials = []string{res.CertSerialNumber}
+	}
+	var revoked []string
+	for _, sn := range serials {
+		if sn != "" && h.store.IsCertificateRevoked(sn) {
+			revoked = append(revoked, sn)
+		}
+	}
+	if len(revoked) > 0 {
 		res.IsRevoked = true
 		res.IsValid = false
-		res.Message = "DOKUMEN DITOLAK: Sertifikat elektronik penanda tangan telah dicabut resmi (Revoked)!"
+		if len(serials) > 1 {
+			res.Message = fmt.Sprintf("DOKUMEN DITOLAK: %d dari %d sertifikat elektronik penanda tangan pada dokumen ini telah dicabut resmi (Revoked)!", len(revoked), len(serials))
+		} else {
+			res.Message = "DOKUMEN DITOLAK: Sertifikat elektronik penanda tangan telah dicabut resmi (Revoked)!"
+		}
 		res.IntegrityStatus = res.Message
+		_ = h.store.RecordActivity("SECURITY", "WARN", res.SignerFullName, "PAdES_VERIFY_REVOKED", fmt.Sprintf("Verifikasi menolak dokumen: %d sertifikat tercabut", len(revoked)), r.RemoteAddr, r.UserAgent())
 	}
 
 	statusStr := "SUCCESS"

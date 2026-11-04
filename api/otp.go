@@ -393,10 +393,11 @@ func (h *APIHandler) HandleAuthVerifyOTP(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleAuthTestInspectOTP mengizinkan pengujian otomatis lokal membaca kode OTP.
-// Rute ini hanya didaftarkan di luar produksi (lihat RegisterRoutes); pemeriksaan
-// berikut adalah lapis kedua agar kode OTP tidak mungkin bocor di produksi.
+// Rute ini hanya didaftarkan bila diaktifkan eksplisit (lihat RegisterRoutes);
+// pemeriksaan berikut adalah lapis kedua agar kode OTP tidak mungkin bocor
+// walau rute terdaftar karena kekeliruan konfigurasi.
 func (h *APIHandler) HandleAuthTestInspectOTP(w http.ResponseWriter, r *http.Request) {
-	if IsProductionEnv() {
+	if !IsTestEndpointsEnabled() {
 		SendError(w, http.StatusNotFound, "Endpoint tidak tersedia")
 		return
 	}

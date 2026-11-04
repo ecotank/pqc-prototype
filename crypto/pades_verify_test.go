@@ -286,3 +286,68 @@ func TestEscapePDFStringEscapesDelimiters(t *testing.T) {
 		t.Fatalf("hasil escape %q, diharapkan %q", got, want)
 	}
 }
+
+// TestVerifyPDFPAdESRejectsAppendedRevision adalah uji regresi untuk Incremental
+// Saving Attack: penyerang menambahkan revisi inkremental baru di belakang
+// rentang yang ditandatangani. Byte tambahan itu tidak tercakup tanda tangan mana
+// pun, namun sebelumnya dokumen tetap dinyatakan asli dan utuh.
+func TestVerifyPDFPAdESRejectsAppendedRevision(t *testing.T) {
+	signed := signTestPDF(t, minimalPDF(), "ARS-TEST-APPEND", "Pejabat Penandatangan Resmi, S.Kom.")
+
+	appended := append(append([]byte(nil), signed...), []byte(
+		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R /Perms << >> >>\nendobj\n"+
+			"xref\n1 1\n0000000009 00000 n \n"+
+			"trailer\n<< /Size 13 /Root 1 0 R /Prev 100 >>\nstartxref\n66700\n%%EOF\n")...)
+
+	res, err := VerifyPDFPAdES(appended)
+	if err != nil {
+		// Penolakan melalui error juga memenuhi syarat.
+		return
+	}
+	if res.IsValid {
+		t.Fatalf("revisi yang ditambahkan setelah penandatanganan seharusnya ditolak: %s", res.Message)
+	}
+	if !res.HasUnsignedChanges {
+		t.Fatal("perubahan di luar cakupan tanda tangan seharusnya dilaporkan")
+	}
+}
+
+// TestVerifyPDFPAdESAllowsTrailingWhitespace memastikan ruang kosong setelah
+// %%EOF tidak dianggap perubahan tak bertanda tangan.
+func TestVerifyPDFPAdESAllowsTrailingWhitespace(t *testing.T) {
+	signed := signTestPDF(t, minimalPDF(), "ARS-TEST-WS", "Pejabat Penandatangan Resmi, S.Kom.")
+	padded := append(append([]byte(nil), signed...), []byte("\r\n \t\n")...)
+
+	res, err := VerifyPDFPAdES(padded)
+	if err != nil {
+		t.Fatalf("VerifyPDFPAdES gagal: %v", err)
+	}
+	if res.HasUnsignedChanges {
+		t.Fatal("ruang kosong di akhir berkas tidak boleh dianggap perubahan")
+	}
+	if !res.IsValid {
+		t.Fatalf("dokumen seharusnya tetap SAH: %s", res.Message)
+	}
+}
+
+// TestVerifyPDFPAdESCollectsEverySerial memastikan nomor seri setiap revisi
+// dikembalikan, sehingga pemeriksaan pencabutan dapat menyentuh seluruh
+// penanda tangan, bukan hanya yang terakhir.
+func TestVerifyPDFPAdESCollectsEverySerial(t *testing.T) {
+	first := signTestPDF(t, minimalPDF(), "ARS-TEST-SERIAL-1", "Penandatangan Dokumen Satu, S.Kom.")
+	second := signTestPDF(t, first, "ARS-TEST-SERIAL-2", "Penandatangan Dokumen Dua, S.Kom.")
+
+	res, err := VerifyPDFPAdES(second)
+	if err != nil {
+		t.Fatalf("VerifyPDFPAdES gagal: %v", err)
+	}
+	if len(res.CertSerialNumbers) != 2 {
+		t.Fatalf("jumlah nomor seri %d, diharapkan 2", len(res.CertSerialNumbers))
+	}
+	if res.CertSerialNumbers[0] == res.CertSerialNumbers[1] {
+		t.Fatal("kedua revisi seharusnya memakai sertifikat berbeda")
+	}
+	if res.CertSerialNumbers[1] != res.CertSerialNumber {
+		t.Fatal("nomor seri terakhir harus sama dengan penanda tangan terkini")
+	}
+}
