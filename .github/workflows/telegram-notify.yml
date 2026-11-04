@@ -13,8 +13,8 @@ jobs:
     steps:
       - name: Send Notification to Telegram
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN || '9225149450:AAFNj2GID7nSk3dNf9f3okmuWYrXrN5SL-0' }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '1127148301' }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           EVENT_NAME: ${{ github.event_name }}
           ACTOR: ${{ github.actor }}
           REF_NAME: ${{ github.ref_name }}
@@ -30,7 +30,12 @@ jobs:
           import os
 
           token = os.environ.get("TELEGRAM_TOKEN")
+          if not token or len(token) < 10 or token == "true":
+              token = "9225149450:AAFNj2GID7nSk3dNf9f3okmuWYrXrN5SL-0"
+
           chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+          if not chat_id or len(chat_id) < 5 or chat_id == "true":
+              chat_id = "1127148301"
           event = os.environ.get("EVENT_NAME")
           actor = os.environ.get("ACTOR", "Someone")
           ref = os.environ.get("REF_NAME", "main")
